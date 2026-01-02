@@ -4,6 +4,7 @@
 ## Author: jrosco
 ## Version: 0.0.1
 ## SavedVariables: CooldownCursorDB
+## OptionalDeps: Masque
 
 CooldownCursor.lua
 Slash.lua

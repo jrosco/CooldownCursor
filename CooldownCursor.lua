@@ -91,7 +91,6 @@ icon.fadeOut:SetScript("OnFinished", function()
   icon:SetScript("OnUpdate", nil)
   icon.cooldown:Clear()
   icon.text:Hide()
-
   icon:Hide()
   icon:SetAlpha(1) -- reset for next show
 end)
@@ -156,7 +155,6 @@ local function HideIconNow()
     hideTimer = nil
   end
   activeSpellID, activeStartTime, activeDuration = nil, nil, nil
-
   if CooldownCursorDB.fadeOutDuration == 0 then
     icon:Hide()
     icon:SetAlpha(1)

@@ -2,7 +2,7 @@
 ## Title: CooldownCursor
 ## Notes: Shows failed spell cooldowns at the mouse cursor
 ## Author: jrosco
-## Version: 0.0.1
+## Version: 0.0.3
 ## SavedVariables: CooldownCursorDB
 ## OptionalDeps: Masque
 

@@ -10,6 +10,9 @@ addonTable.Frame = CooldownCursor
 ----------------------------------------------------
 local lastSpellId = nil
 local hideTimer = nil
+local activeSpellID = nil
+local activeStartTime = nil
+local activeDuration = nil
 
 ----------------------------------------------------
 -- Defaults / SavedVariables
@@ -109,15 +112,59 @@ function CooldownCursor:ApplyVisualSettings()
   -- Hide countdown numbers when enabled
   icon.cooldown:SetHideCountdownNumbers(CooldownCursorDB.hideCooldownNumbers)
 
-  icon.cooldown:SetDrawSwipe(
-    CooldownCursorDB.showCooldownSwipe
-  )
   icon.cooldown:SetDrawSwipe(CooldownCursorDB.showCooldownSwipe)
 
   -- Masque re-skin after icon changes
   if MasqueGroup then
     MasqueGroup:ReSkin()
   end
+end
+
+----------------------------------------------------
+-- Internal hide helper
+----------------------------------------------------
+local function HideIconNow()
+  icon:SetScript("OnUpdate", nil)
+  icon.cooldown:Clear()
+  icon:Hide()
+  icon.text:Hide()
+
+  lastSpellId = nil
+  if hideTimer then
+    hideTimer:Cancel()
+    hideTimer = nil
+  end
+  activeSpellID, activeStartTime, activeDuration = nil, nil, nil
+end
+
+----------------------------------------------------
+-- Scheduled Hide timer
+----------------------------------------------------
+local function ScheduleHideTimer()
+  if not activeSpellID or not activeStartTime or not activeDuration then return end
+
+  if hideTimer then
+    hideTimer:Cancel()
+    hideTimer = nil
+  end
+
+  local timeLeft = (activeStartTime + activeDuration) - GetTime()
+  if timeLeft <= 0 then
+    if lastSpellId == activeSpellID then
+      HideIconNow()
+    else
+      activeSpellID, activeStartTime, activeDuration = nil, nil, nil
+    end
+    return
+  end
+
+  local hideDelay = math.min(timeLeft, CooldownCursorDB.hideAfter)
+
+  hideTimer = C_Timer.NewTimer(hideDelay, function()
+    if lastSpellId == activeSpellID then
+      HideIconNow()
+    end
+  end)
 end
 
 ----------------------------------------------------
@@ -158,7 +205,10 @@ end
 
 function CooldownCursor:SetHideAfter(seconds)
   CooldownCursorDB.hideAfter = seconds
-  icon:Hide()
+  -- If icon currently visible, re-arm timer using new value
+  if icon:IsShown() and lastSpellId then
+    ScheduleHideTimer()
+  end
 end
 
 function CooldownCursor:SetAnimation(enabled)
@@ -166,14 +216,10 @@ function CooldownCursor:SetAnimation(enabled)
 end
 
 function CooldownCursor:ResetSettings()
+  HideIconNow()
   CooldownCursorDB = {}
   self:ApplyDefaults()
   self:ApplyVisualSettings()
-  icon.cooldown:Clear()
-  icon:Hide()
-  icon.text:Hide()
-  lastSpellId = nil
-  hideTimer = nil
 end
 
 ----------------------------------------------------
@@ -204,6 +250,10 @@ local function ShowSpellIcon(spellID, startTime, duration)
   icon.icon:SetTexture(spellInfo.iconID)
   icon.cooldown:SetCooldown(startTime, duration)
 
+  activeSpellID = spellID
+  activeStartTime = startTime
+  activeDuration = duration
+
   if CooldownCursorDB.showSpellNames and spellInfo.name then
     icon.text:SetText(spellInfo.name)
     icon.text:Show()
@@ -214,23 +264,8 @@ local function ShowSpellIcon(spellID, startTime, duration)
   icon:SetScript("OnUpdate", UpdateCooldownIconFrame)
   icon:Show()
 
-  -- Reset timer for same spell
-  if hideTimer then
-    hideTimer:Cancel()
-    hideTimer = nil
-  end
-
-  local hideDelay = math.min(duration, CooldownCursorDB.hideAfter)
-  hideTimer = C_Timer.NewTimer(hideDelay, function()
-    if lastSpellId == spellID then
-      icon:SetScript("OnUpdate", nil)
-      icon.cooldown:Clear()
-      icon:Hide()
-      icon.text:Hide()
-      lastSpellId = nil
-      hideTimer = nil
-    end
-  end)
+  -- Always (re)schedule hide after showing
+  ScheduleHideTimer()
 end
 
 ----------------------------------------------------
@@ -252,18 +287,9 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   local cd = C_Spell.GetSpellCooldown(spellID)
   if not cd or not cd.startTime or not cd.duration then return end
 
-  -- Same spell: reset timer, different spell: override
-  if lastSpellId then
-    if lastSpellId ~= spellID then
-      if hideTimer then
-        hideTimer:Cancel()
-        hideTimer = nil
-      end
-      icon:SetScript("OnUpdate", nil)
-      icon.cooldown:Clear()
-      icon:Hide()
-      icon.text:Hide()
-    end
+  -- Different spell overrides current display immediately
+  if lastSpellId and lastSpellId ~= spellID then
+    HideIconNow()
   end
 
   lastSpellId = spellID

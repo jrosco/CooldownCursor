@@ -95,6 +95,9 @@ SlashCmdList["COOLDOWNCURSOR"] = function(msg)
   elseif cmd == "reset" then
     CooldownCursor:ResetSettings()
     print("|cff00ff00CooldownCursor|r settings reset to default.")
+  elseif cmd == "preview" then
+    CooldownCursor:Preview()
+    print("|cff00ff00CooldownCursor|r previewing cooldown icon.")
   else
     -- Show help
     print([[
@@ -110,6 +113,7 @@ SlashCmdList["COOLDOWNCURSOR"] = function(msg)
  /cdcursor animation <on|off>  - Set icon animation
  /cdcursor fadeout <sec>       - Set icon fade-out duration
  /cdcursor reset               - Reset all settings to default
+ /cdcursor preview             - Preview the cooldown icon
         ]])
   end
 end

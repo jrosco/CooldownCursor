@@ -15,6 +15,12 @@ local activeStartTime = nil
 local activeDuration = nil
 
 ----------------------------------------------------
+-- Live Preview state
+----------------------------------------------------
+local previewActive = false
+local previewTicker = nil
+
+----------------------------------------------------
 -- Defaults / SavedVariables
 ----------------------------------------------------
 local defaults = {
@@ -143,6 +149,12 @@ end
 -- Internal hide helper
 ----------------------------------------------------
 local function HideIconNow()
+  if previewTicker then
+    previewTicker:Cancel()
+    previewTicker = nil
+  end
+  previewActive = false
+
   if CooldownCursorDB.fadeOutDuration == 0 then
     icon:SetScript("OnUpdate", nil)
     icon.cooldown:Clear()
@@ -308,6 +320,41 @@ local function ShowSpellIcon(spellID, startTime, duration)
 
   -- Always (re)schedule hide after showing
   ScheduleHideTimer()
+end
+
+----------------------------------------------------
+-- Live Preview API
+----------------------------------------------------
+function CooldownCursor:Preview()
+  local previewSpellID = 116 -- Frostbolt (safe)
+  local previewDuration = 30
+
+  if previewActive then
+    previewActive = false
+    if previewTicker then
+      previewTicker:Cancel()
+      previewTicker = nil
+    end
+    HideIconNow()
+    return
+  end
+
+  previewActive = true
+
+  -- Show once using your normal function/path
+  ShowSpellIcon(previewSpellID, GetTime(), previewDuration)
+
+  -- Loop: when it finishes, start again
+  -- It loops because C_Timer.NewTicker() is the loop.
+  if previewTicker then
+    previewTicker:Cancel()
+    previewTicker = nil
+  end
+
+  previewTicker = C_Timer.NewTicker(previewDuration, function()
+    if not previewActive or not icon:IsShown() then return end
+    icon.cooldown:SetCooldown(GetTime(), previewDuration)
+  end)
 end
 
 ----------------------------------------------------

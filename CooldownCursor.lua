@@ -202,7 +202,7 @@ end
 -- Settings API
 ----------------------------------------------------
 function CooldownCursor:SetIconSize(size)
-  CooldownCursorDB.iconSize = size
+  CooldownCursorDB.iconSize = tonumber(size) or defaults.iconSize
   self:ApplyVisualSettings()
 end
 
@@ -222,21 +222,21 @@ function CooldownCursor:SetShowCooldownSwipe(enabled)
 end
 
 function CooldownCursor:SetOffset(x, y)
-  CooldownCursorDB.offsetX = x
-  CooldownCursorDB.offsetY = y
+  CooldownCursorDB.offsetX = tonumber(x) or defaults.offsetX
+  CooldownCursorDB.offsetY = tonumber(y) or defaults.offsetY
 end
 
 function CooldownCursor:SetMinDuration(seconds)
-  CooldownCursorDB.minDuration = seconds
+  CooldownCursorDB.minDuration = tonumber(seconds) or defaults.minDuration
 end
 
 function CooldownCursor:SetMaxDuration(seconds)
-  CooldownCursorDB.maxDuration = seconds
+  CooldownCursorDB.maxDuration = tonumber(seconds) or defaults.maxDuration
 end
 
 function CooldownCursor:SetHideAfter(seconds)
-  CooldownCursorDB.hideAfter = seconds
-  -- If icon currently visible, re-arm timer using new value
+  CooldownCursorDB.hideAfter = tonumber(seconds) or defaults.hideAfter
+  -- If icon currently visible, re-arm timer using new value 
   if icon:IsShown() and lastSpellId then
     ScheduleHideTimer()
   end
@@ -247,7 +247,7 @@ function CooldownCursor:SetAnimation(enabled)
 end
 
 function CooldownCursor:SetFadeOutDuration(seconds)
-  CooldownCursorDB.fadeOutDuration = seconds
+  CooldownCursorDB.fadeOutDuration = tonumber(seconds) or defaults.fadeOutDuration
   -- If icon currently visible, re-arm timer using new value 
   if icon:IsShown() and lastSpellId then
     ScheduleHideTimer()

@@ -104,19 +104,15 @@ end
 -- Apply visual settings
 ----------------------------------------------------
 function CooldownCursor:ApplyVisualSettings()
-  icon:SetSize(
-    CooldownCursorDB.iconSize,
-    CooldownCursorDB.iconSize
-  )
+  icon:SetSize(CooldownCursorDB.iconSize, CooldownCursorDB.iconSize)
 
-  -- TODO: Not working needs investigation
-  icon.cooldown:SetHideCountdownNumbers(
-    not CooldownCursorDB.hideCooldownNumbers
-  )
+  -- Hide countdown numbers when enabled
+  icon.cooldown:SetHideCountdownNumbers(CooldownCursorDB.hideCooldownNumbers)
 
   icon.cooldown:SetDrawSwipe(
     CooldownCursorDB.showCooldownSwipe
   )
+  icon.cooldown:SetDrawSwipe(CooldownCursorDB.showCooldownSwipe)
 
   -- Masque re-skin after icon changes
   if MasqueGroup then
@@ -244,7 +240,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if event == "ADDON_LOADED" then
     local name = ...
     if name ~= addonName then return end
-
     self:ApplyDefaults()
     self:ApplyVisualSettings()
     self:UnregisterEvent("ADDON_LOADED")

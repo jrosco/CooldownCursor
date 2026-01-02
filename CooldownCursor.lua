@@ -236,7 +236,7 @@ end
 
 function CooldownCursor:SetHideAfter(seconds)
   CooldownCursorDB.hideAfter = tonumber(seconds) or defaults.hideAfter
-  -- If icon currently visible, re-arm timer using new value 
+  -- If icon currently visible, re-arm timer using new value
   if icon:IsShown() and lastSpellId then
     ScheduleHideTimer()
   end
@@ -249,8 +249,8 @@ end
 function CooldownCursor:SetFadeOutDuration(seconds)
   CooldownCursorDB.fadeOutDuration = tonumber(seconds) or defaults.fadeOutDuration
   -- If icon currently visible, re-arm timer using new value 
-  if icon:IsShown() and lastSpellId then
-    ScheduleHideTimer()
+  if icon:IsShown() then
+    HideIconNow()
   end
 end
 

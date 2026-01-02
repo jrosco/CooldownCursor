@@ -1,0 +1,9 @@
+## Interface: 110207
+## Title: CooldownCursor
+## Notes: Shows failed spell cooldowns at the mouse cursor
+## Author: jrosco
+## Version: 1.0.0
+## SavedVariables: CooldownCursorDB
+
+CooldownCursor.lua
+Slash.lua

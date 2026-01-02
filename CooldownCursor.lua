@@ -27,7 +27,9 @@ local defaults = {
   hideAfter = 3,
   animation = false,
   minDuration = 1.5,
-  maxDuration = 600
+  maxDuration = 600,
+  fadeOutDuration = 0,
+  fadeInDuration = 0,
 }
 
 function CooldownCursor:ApplyDefaults()
@@ -75,6 +77,28 @@ local scaleDown = icon.showAnim:CreateAnimation("Scale")
 scaleDown:SetOrder(2)
 scaleDown:SetScale(1 / 1.15, 1 / 1.15)
 scaleDown:SetDuration(0.08)
+
+----------------------------------------------------
+-- Fade out helper
+----------------------------------------------------
+icon.fadeIn = icon:CreateAnimationGroup()
+local fadeIn = icon.fadeIn:CreateAnimation("Alpha")
+fadeIn:SetFromAlpha(0)
+fadeIn:SetToAlpha(1)
+fadeIn:SetDuration(defaults.fadeInDuration or 0)
+fadeIn:SetSmoothing("IN")
+
+icon.fadeOut = icon:CreateAnimationGroup()
+local fadeOut = icon.fadeOut:CreateAnimation("Alpha")
+fadeOut:SetFromAlpha(1)
+fadeOut:SetToAlpha(0)
+fadeOut:SetDuration(defaults.fadeOutDuration or 0)
+fadeOut:SetSmoothing("OUT")
+
+icon.fadeOut:SetScript("OnFinished", function()
+  icon:Hide()
+  icon:SetAlpha(1) -- reset for next show
+end)
 
 ----------------------------------------------------
 -- Masque support
@@ -126,7 +150,6 @@ end
 local function HideIconNow()
   icon:SetScript("OnUpdate", nil)
   icon.cooldown:Clear()
-  icon:Hide()
   icon.text:Hide()
 
   lastSpellId = nil
@@ -135,6 +158,19 @@ local function HideIconNow()
     hideTimer = nil
   end
   activeSpellID, activeStartTime, activeDuration = nil, nil, nil
+
+  -- Stop any fade-in; optionally fade-out then hide
+  icon.fadeIn:Stop()
+  icon.fadeOut:Stop()
+
+  if CooldownCursorDB.fadeOutDuration == 0 then
+    icon:Hide()
+    icon:SetAlpha(1)
+  else
+    fadeOut:SetDuration(CooldownCursorDB.fadeOutDuration)
+    icon:SetAlpha(1)
+    icon.fadeOut:Play()
+  end
 end
 
 ----------------------------------------------------
@@ -215,6 +251,14 @@ function CooldownCursor:SetAnimation(enabled)
   CooldownCursorDB.animation = enabled
 end
 
+function CooldownCursor:SetFadeInDuration(seconds)
+  CooldownCursorDB.fadeInDuration = seconds
+end
+
+function CooldownCursor:SetFadeOutDuration(seconds)
+  CooldownCursorDB.fadeOutDuration = seconds
+end
+
 function CooldownCursor:ResetSettings()
   HideIconNow()
   CooldownCursorDB = {}
@@ -262,7 +306,20 @@ local function ShowSpellIcon(spellID, startTime, duration)
   end
 
   icon:SetScript("OnUpdate", UpdateCooldownIconFrame)
-  icon:Show()
+
+  -- Stop any fade-out in progress so it doesn't hide us on finish
+  icon.fadeOut:Stop()
+  icon.fadeIn:Stop()
+
+  if CooldownCursorDB.fadeInDuration == 0 then
+    icon:SetAlpha(1)
+    icon:Show()
+  else
+    fadeIn:SetDuration(CooldownCursorDB.fadeInDuration)
+    icon:SetAlpha(0)
+    icon:Show()
+    icon.fadeIn:Play()
+  end
 
   -- Always (re)schedule hide after showing
   ScheduleHideTimer()

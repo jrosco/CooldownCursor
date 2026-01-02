@@ -95,6 +95,22 @@ SlashCmdList["COOLDOWNCURSOR"] = function(msg)
     else
       print("|cff00ff00CooldownCursor|r usage: /cdcursor max <seconds>")
     end
+  elseif cmd == "fadein" then
+    local seconds = tonumber(arg1)
+    if seconds then
+      CooldownCursor:SetFadeInDuration(seconds)
+      print("|cff00ff00CooldownCursor|r cooldown fade in duration:", seconds)
+    else
+      print("|cff00ff00CooldownCursor|r usage: /cdcursor fadein <seconds>")
+    end
+  elseif cmd == "fadeout" then
+    local seconds = tonumber(arg1)
+    if seconds then
+      CooldownCursor:SetFadeOutDuration(seconds)
+      print("|cff00ff00CooldownCursor|r cooldown fade out duration:", seconds)
+    else
+      print("|cff00ff00CooldownCursor|r usage: /cdcursor fadeout <seconds>")
+    end
   elseif cmd == "reset" then
     CooldownCursor:ResetSettings()
     print("|cff00ff00CooldownCursor|r settings reset to default.")
@@ -111,6 +127,8 @@ SlashCmdList["COOLDOWNCURSOR"] = function(msg)
  /cdcursor min <sec>           - Set min duration of spell cooldowns
  /cdcursor max <sec>           - Set max duration of spell cooldowns
  /cdcursor animation <on|off>  - Set icon animation
+ /cdcursor fadein <sec>        - Set icon fade-in duration
+ /cdcursor fadeout <sec>       - Set icon fade-out duration
  /cdcursor reset               - Reset all settings to default
         ]])
   end

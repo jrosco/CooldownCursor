@@ -129,18 +129,37 @@ local function UpdateCooldownIconFrame(self)
 end
 
 ----------------------------------------------------
--- Apply visual settings
+-- Apply settings and refresh active display
 ----------------------------------------------------
-function CooldownCursor:ApplyVisualSettings()
+function CooldownCursor:UpdateDisplay()
+  -- Set icon size
   icon:SetSize(CooldownCursorDB.iconSize, CooldownCursorDB.iconSize)
 
   -- Hide countdown numbers when enabled
-  icon.cooldown:SetHideCountdownNumbers(CooldownCursorDB.hideCooldownNumbers)
+  icon.cooldown:SetHideCountdownNumbers(
+    CooldownCursorDB.hideCooldownNumbers
+  )
 
-  icon.cooldown:SetDrawSwipe(CooldownCursorDB.showCooldownSwipe)
+  -- Show/hide cooldown swipe
+  icon.cooldown:SetDrawSwipe(
+    CooldownCursorDB.showCooldownSwipe
+  )
 
-  -- Masque re-skin after icon changes
-  if MasqueGroup then
+  -- Refresh active live spell name
+  if icon:IsShown() and activeSpellID then
+    local info = C_Spell.GetSpellInfo(activeSpellID)
+    if CooldownCursorDB.showSpellNames and info.name then
+      icon.text:SetText(info.name)
+      icon.text:Show()
+    else
+      icon.text:Hide()
+    end
+  else
+    icon.text:Hide()
+  end
+
+  -- Masque re-skin after active live icon changes
+  if MasqueGroup and icon:IsShown() then
     MasqueGroup:ReSkin()
   end
 end
@@ -213,22 +232,22 @@ end
 ----------------------------------------------------
 function CooldownCursor:SetIconSize(size)
   CooldownCursorDB.iconSize = tonumber(size) or defaults.iconSize
-  self:ApplyVisualSettings()
+  self:UpdateDisplay()
 end
 
 function CooldownCursor:SetShowSpellNames(enabled)
   CooldownCursorDB.showSpellNames = enabled
+  self:UpdateDisplay()
 end
 
--- TODO: Not working needs investigation
 function CooldownCursor:SetHideCooldownNumbers(enabled)
   CooldownCursorDB.hideCooldownNumbers = enabled
-  self:ApplyVisualSettings()
+  self:UpdateDisplay()
 end
 
 function CooldownCursor:SetShowCooldownSwipe(enabled)
   CooldownCursorDB.showCooldownSwipe = enabled
-  self:ApplyVisualSettings()
+  self:UpdateDisplay()
 end
 
 function CooldownCursor:SetOffset(x, y)
@@ -268,7 +287,7 @@ function CooldownCursor:ResetSettings()
   HideIconNow()
   CooldownCursorDB = {}
   self:ApplyDefaults()
-  self:ApplyVisualSettings()
+  self:UpdateDisplay()
 end
 
 ----------------------------------------------------
@@ -287,7 +306,7 @@ local function ShowSpellIcon(spellID, startTime, duration)
   end
 
   -- Apply settings before showing
-  CooldownCursor:ApplyVisualSettings()
+  CooldownCursor:UpdateDisplay()
 
   -- Pop in animation
   if CooldownCursorDB.animation then
@@ -365,7 +384,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     local name = ...
     if name ~= addonName then return end
     self:ApplyDefaults()
-    self:ApplyVisualSettings()
+    self:UpdateDisplay()
     self:UnregisterEvent("ADDON_LOADED")
     return
   end

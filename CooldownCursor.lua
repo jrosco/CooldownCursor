@@ -11,8 +11,6 @@ addonTable.Frame = CooldownCursor
 local lastSpellId = nil
 local hideTimer = nil
 local activeSpellID = nil
-local activeStartTime = nil
-local activeDuration = nil
 
 ----------------------------------------------------
 -- Live Preview state
@@ -185,7 +183,7 @@ local function HideIconNow()
     hideTimer:Cancel()
     hideTimer = nil
   end
-  activeSpellID, activeStartTime, activeDuration = nil, nil, nil
+  activeSpellID = nil
   if CooldownCursorDB.fadeOutDuration == 0 then
     icon:Hide()
     icon:SetAlpha(1)
@@ -201,24 +199,15 @@ end
 -- Scheduled Hide timer
 ----------------------------------------------------
 local function ScheduleHideTimer()
-  if not activeSpellID or not activeStartTime or not activeDuration then return end
+  if not activeSpellID then return end
 
   if hideTimer then
     hideTimer:Cancel()
     hideTimer = nil
   end
 
-  local timeLeft = (activeStartTime + activeDuration) - GetTime()
-  if timeLeft <= 0 then
-    if lastSpellId == activeSpellID then
-      HideIconNow()
-    else
-      activeSpellID, activeStartTime, activeDuration = nil, nil, nil
-    end
-    return
-  end
-
-  local hideDelay = math.min(timeLeft, CooldownCursorDB.hideAfter)
+  -- Use fixed hideAfter duration (Midnight-safe)
+  local hideDelay = CooldownCursorDB.hideAfter or defaults.hideAfter
 
   hideTimer = C_Timer.NewTimer(hideDelay, function()
     if lastSpellId == activeSpellID then
@@ -297,14 +286,6 @@ local function ShowSpellIcon(spellID, startTime, duration)
   local spellInfo = C_Spell.GetSpellInfo(spellID)
   if not spellInfo or not spellInfo.iconID then return end
 
-  local timeLeft = (startTime + duration) - GetTime()
-  if timeLeft <= 1
-      or duration < (CooldownCursorDB.minDuration or 1.5)
-      or duration > (CooldownCursorDB.maxDuration or math.huge)
-  then
-    return
-  end
-
   -- Apply settings before showing
   CooldownCursor:UpdateDisplay()
 
@@ -319,8 +300,6 @@ local function ShowSpellIcon(spellID, startTime, duration)
   icon.cooldown:SetCooldown(startTime, duration)
 
   activeSpellID = spellID
-  activeStartTime = startTime
-  activeDuration = duration
 
   if CooldownCursorDB.showSpellNames and spellInfo.name then
     icon.text:SetText(spellInfo.name)
@@ -389,19 +368,25 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
-  local unit, _, spellID = ...
-  if unit ~= "player" or not spellID then return end
+  if event == "UNIT_SPELLCAST_FAILED" then
 
-  local cd = C_Spell.GetSpellCooldown(spellID)
-  if not cd or not cd.startTime or not cd.duration then return end
+    local unit, _, spellID = ...
+    if unit ~= "player" or not spellID then return end
 
-  -- Different spell overrides current display immediately
-  if lastSpellId and lastSpellId ~= spellID then
-    HideIconNow()
+    local cd = C_Spell.GetSpellCooldown(spellID)
+    local usable = C_Spell.IsSpellUsable(spellID)
+    local inRange = C_Spell.IsSpellInRange(spellID)
+    if usable == false or inRange == false then return end
+    if not cd or not cd.startTime or not cd.duration or cd.isOnGCD then return end
+
+    -- Different spell overrides current display immediately
+    if lastSpellId and lastSpellId ~= spellID then
+      HideIconNow()
+    end
+
+    lastSpellId = spellID
+    ShowSpellIcon(spellID, cd.startTime, cd.duration)
   end
-
-  lastSpellId = spellID
-  ShowSpellIcon(spellID, cd.startTime, cd.duration)
 end)
 
 ----------------------------------------------------

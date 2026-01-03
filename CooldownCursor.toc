@@ -1,4 +1,4 @@
-## Interface: 110207
+## Interface: 110207, 120000, 120001
 ## Title: CooldownCursor
 ## Notes: Shows failed spell cooldowns at the mouse cursor
 ## Author: jrosco

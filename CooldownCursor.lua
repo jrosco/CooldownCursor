@@ -11,6 +11,25 @@ addonTable.Frame = CooldownCursor
 local lastSpellId = nil
 local hideTimer = nil
 local activeSpellID = nil
+local inCombat = false
+
+local SHOW_WHEN_STATE = {
+  ALWAYS = 0,
+  COMBAT = 1,
+  NON_COMBAT = 2,
+}
+
+local ANCHOR_POSITION = {
+  CENTER = "CENTER",
+  TOP = "TOP",
+  BOTTOM = "BOTTOM",
+  LEFT = "LEFT",
+  RIGHT = "RIGHT",
+  TOPLEFT = "TOPLEFT",
+  TOPRIGHT = "TOPRIGHT",
+  BOTTOMLEFT = "BOTTOMLEFT",
+  BOTTOMRIGHT = "BOTTOMRIGHT",
+}
 
 ----------------------------------------------------
 -- Live Preview state
@@ -33,6 +52,9 @@ local defaults = {
   minDuration = 1.5,
   maxDuration = 600,
   fadeOutDuration = 0,
+  showWhen = SHOW_WHEN_STATE.ALWAYS, -- 0=always, 1=in-combat, 2=out-of-combat
+  anchor = ANCHOR_POSITION.TOPRIGHT,
+  anchorPadding = 2, -- distance from cursor
 }
 
 function CooldownCursor:ApplyDefaults()
@@ -49,10 +71,7 @@ end
 ----------------------------------------------------
 local icon = CreateFrame("Frame", "CooldownCursorIcon", UIParent)
 icon:EnableMouse(false)
-icon:SetSize(
-  CooldownCursorDB and CooldownCursorDB.iconSize or defaults.iconSize,
-  CooldownCursorDB and CooldownCursorDB.iconSize or defaults.iconSize
-)
+icon:SetSize(defaults.iconSize, defaults.iconSize)
 icon:Hide()
 
 icon.icon = icon:CreateTexture(nil, "BACKGROUND")
@@ -112,19 +131,106 @@ if MasqueGroup then
 end
 
 ----------------------------------------------------
--- Cursor follow
+-- Internal cursor positioning helper
+----------------------------------------------------
+local function FlipAnchorX(anchor)
+  if anchor:find("LEFT") then
+    return anchor:gsub("LEFT", "RIGHT")
+  elseif anchor:find("RIGHT") then
+    return anchor:gsub("RIGHT", "LEFT")
+  elseif anchor == "LEFT" then
+    return "RIGHT"
+  elseif anchor == "RIGHT" then
+    return "LEFT"
+  end
+  return anchor
+end
+
+local function FlipAnchorY(anchor)
+  if anchor:find("TOP") then
+    return anchor:gsub("TOP", "BOTTOM")
+  elseif anchor:find("BOTTOM") then
+    return anchor:gsub("BOTTOM", "TOP")
+  elseif anchor == "TOP" then
+    return "BOTTOM"
+  elseif anchor == "BOTTOM" then
+    return "TOP"
+  end
+  return anchor
+end
+
+local function AnchorOffsets(anchor, size, pad)
+  local half = (size / 2)
+  local d = half + (pad or 0)
+  local ox, oy = 0, 0
+
+  if anchor == "TOP" then
+    oy = d
+  elseif anchor == "BOTTOM" then
+    oy = -d
+  elseif anchor == "LEFT" then
+    ox = -d
+  elseif anchor == "RIGHT" then
+    ox = d
+  elseif anchor == "TOPLEFT" then
+    ox, oy = -d, d
+  elseif anchor == "TOPRIGHT" then
+    ox, oy = d, d
+  elseif anchor == "BOTTOMLEFT" then
+    ox, oy = -d, -d
+  elseif anchor == "BOTTOMRIGHT" then
+    ox, oy = d, -d
+  end
+
+  return ox, oy
+end
+
+----------------------------------------------------
+-- Cursor tracking and positioning
 ----------------------------------------------------
 local function UpdateCooldownIconFrame(self)
   local scale = UIParent:GetEffectiveScale()
-  local x, y = GetCursorPosition()
-  self:SetPoint(
-    "CENTER",
-    UIParent,
-    "BOTTOMLEFT",
-    (x / scale) + CooldownCursorDB.offsetX,
-    (y / scale) + CooldownCursorDB.offsetY
-  )
+  local cursorX, cursorY = GetCursorPosition()
+
+  local x = cursorX / scale
+  local y = cursorY / scale
+
+  local size = CooldownCursorDB.iconSize or 48
+  local pad  = CooldownCursorDB.anchorPadding or 8
+  local anchor = CooldownCursorDB.anchor or "TOP"
+
+  local screenW = UIParent:GetWidth()
+  local screenH = UIParent:GetHeight()
+  local half = size / 2
+
+  -- Calculate desired offsets
+  local ox, oy = AnchorOffsets(anchor, size, pad)
+  local targetX = x + ox
+  local targetY = y + oy
+
+  -- Check if it would go off-screen
+  local offLeft   = (targetX - half) < 0
+  local offRight  = (targetX + half) > screenW
+  local offBottom = (targetY - half) < 0
+  local offTop    = (targetY + half) > screenH
+
+  -- Flip anchor if needed
+  local flipped = anchor
+
+  if offLeft or offRight then
+    flipped = FlipAnchorX(flipped)
+  end
+  if offBottom or offTop then
+    flipped = FlipAnchorY(flipped)
+  end
+
+  -- Recompute offsets after flipping
+  ox, oy = AnchorOffsets(flipped, size, pad)
+
+  self:ClearAllPoints()
+  self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x + ox, y + oy)
 end
+
 
 ----------------------------------------------------
 -- Apply settings and refresh active display
@@ -156,8 +262,12 @@ function CooldownCursor:UpdateDisplay()
     icon.text:Hide()
   end
 
-  -- Masque re-skin after active live icon changes
-  if MasqueGroup and icon:IsShown() then
+  if icon:IsShown() then
+    UpdateCooldownIconFrame(self)
+  end
+
+  -- Masque re-skin icon changes
+  if MasqueGroup then
     MasqueGroup:ReSkin()
   end
 end
@@ -239,9 +349,9 @@ function CooldownCursor:SetShowCooldownSwipe(enabled)
   self:UpdateDisplay()
 end
 
-function CooldownCursor:SetOffset(x, y)
-  CooldownCursorDB.offsetX = tonumber(x) or defaults.offsetX
-  CooldownCursorDB.offsetY = tonumber(y) or defaults.offsetY
+function CooldownCursor:SetAnchor(anchor)
+  CooldownCursorDB.anchor = string.upper(anchor) or defaults.anchor
+  self:UpdateDisplay()
 end
 
 function CooldownCursor:SetMinDuration(seconds)
@@ -270,6 +380,10 @@ function CooldownCursor:SetFadeOutDuration(seconds)
   if icon:IsShown() then
     HideIconNow()
   end
+end
+
+function CooldownCursor:SetShowWhen(state)
+  CooldownCursorDB.showWhen = state
 end
 
 function CooldownCursor:ResetSettings()
@@ -368,7 +482,24 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
+  if event == "PLAYER_REGEN_DISABLED" then
+    inCombat = true
+    return
+  end
+
+  if event == "PLAYER_REGEN_ENABLED" then
+    inCombat = false
+    return
+  end
+
   if event == "UNIT_SPELLCAST_FAILED" then
+    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
+      return
+    end
+
+    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT and not inCombat then
+      return
+    end
 
     local unit, _, spellID = ...
     if unit ~= "player" or not spellID then return end
@@ -394,3 +525,5 @@ end)
 ----------------------------------------------------
 CooldownCursor:RegisterEvent("ADDON_LOADED")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_FAILED")
+CooldownCursor:RegisterEvent("PLAYER_REGEN_DISABLED")
+CooldownCursor:RegisterEvent("PLAYER_REGEN_ENABLED")

@@ -530,6 +530,15 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
 
     -- Different spell overrides current display immediately
     if lastSpellId and lastSpellId ~= spellID then
+       if not cd.duration or cd.duration <= 1 then
+        -- This stops other failed spells e.g out of range from hiding the
+        -- correct cooldown icons when active.
+        -- TODO:
+        -- This will not work in midnight.
+        -- Investigate using cd.isOnGCD and C_Spell.IsSpellInRange in midnight 
+        -- or similar if needed.
+        return
+      end
       HideIconNow()
     end
 

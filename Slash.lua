@@ -52,6 +52,7 @@ local function Help()
  /cdcursor fadeout                  - Set icon fade-out duration in seconds
  /cdcursor hideafter                - Set icon hide-after duration in seconds
  /cdcursor show <0||1||2>           - 0=always, 1=in-combat, 2=out-of-combat
+ /cdcursor mount                    - Toggle hide while mounted
  /cdcursor preview                  - Toggle preview mode
  /cdcursor reset                    - Reset all settings to default
  /cdcursor status                   - Show current settings
@@ -166,6 +167,12 @@ handlers.min = function(arg1)
   if not n then return Usage("/cdcursor min <seconds>") end
   CooldownCursor:SetMinDuration(n)
   Print("cooldown min duration:", n)
+end
+
+handlers.mount = function()
+  local toggle = ToggleBool(CooldownCursorDB.hideWhileMounted)
+  CooldownCursor:SetHideWhenMounted(toggle)
+  Print("hide while mounted is now", toggle and "enabled" or "disabled")
 end
 
 handlers.number = function(arg1, arg2)
@@ -348,6 +355,7 @@ handlers.status = function()
   Print("   hide after:", CooldownCursorDB.hideAfter)
   Print("   hide cooldown numbers:", CooldownCursorDB.hideCooldownNumbers and "on" or "off")
   Print("   icon:", CooldownCursorDB.iconHide and "hidden" or "shown")
+  Print("   hide while mounted:", CooldownCursorDB.hideWhileMounted and "enabled" or "disabled")
   Print("   show spell names:", CooldownCursorDB.showSpellNames and "on" or "off")
   local show = CooldownCursorDB.showWhen
   local showLabel = (show == 0 and "always") or (show == 1 and "in-combat") or "out-of-combat"

@@ -140,6 +140,7 @@ local defaults = {
   maxDuration = 600, -- TODO: remove in midnight
   fadeOutDuration = 0,
   showWhen = SHOW_WHEN_STATE.ALWAYS, -- 0=always, 1=in-combat, 2=out-of-combat
+  hideWhileMounted = false, -- hide when mounted
   anchor = ANCHOR_POSITION.TOPLEFT,
   anchorPadding = 2, -- distance from cursor
   spellTextFont = "Default",
@@ -769,6 +770,10 @@ function CooldownCursor:SetShowWhen(state)
   CooldownCursorDB.showWhen = state
 end
 
+function CooldownCursor:SetHideWhenMounted(state)
+  CooldownCursorDB.hideWhileMounted = state
+end
+
 function CooldownCursor:ResetSettings()
   HideIconNow()
   CooldownCursorDB = {}
@@ -893,6 +898,10 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
 
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT and not inCombat then
+      return
+    end
+
+    if CooldownCursorDB.hideWhileMounted and IsMounted() then
       return
     end
 

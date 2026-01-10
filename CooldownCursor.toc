@@ -4,7 +4,9 @@
 ## Author: jrosco
 ## Version: 0.2.0
 ## SavedVariables: CooldownCursorDB
-## OptionalDeps: Masque, AceConfig, AceConfigDialog
+## OptionalDeps: Masque
+
+embeds.xml
 
 CooldownCursor.lua
 Options.lua

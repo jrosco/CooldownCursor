@@ -2,8 +2,8 @@
 local addonName, addonTable = ...
 local CooldownCursor = addonTable.Frame
 
-local AceConfig = LibStub and LibStub("AceConfig-3.0")
-local AceConfigDialog = LibStub and LibStub("AceConfigDialog-3.0")
+local AceConfig = LibStub and LibStub("AceConfig-3.0", true)
+local AceConfigDialog = LibStub and LibStub("AceConfigDialog-3.0", true)
 
 local function Get(info)
   local key = info[#info]
@@ -31,6 +31,11 @@ local function Set(info, value)
     CooldownCursor:SetAnimation(value)
   elseif key == "anchor" then
     CooldownCursor:SetAnchor(value)
+  elseif key == "showWhen" then
+    local label = (value == "always" and 0)
+    or (value == "inCombat" and 1)
+    or (value == "outOfCombat" and 2)
+    CooldownCursor:SetShowWhen(label)
   else
     -- Fallback: apply live updates if you have a single “refresh” call
     if CooldownCursor.UpdateDisplay then
@@ -44,6 +49,19 @@ local options = {
   type = "group",
   name = "CooldownCursor",
   args = {
+    preview = {
+      type = "execute",
+      name = "Toggle Preview",
+      order = 1,
+      func = function() CooldownCursor:Preview() end,
+    },
+    reset = {
+      type = "execute",
+      name = "Reset to Defaults",
+      order = 2,
+      confirm = true,
+      func = function() CooldownCursor:ResetSettings() end,
+    },
     general = {
       type = "group",
       name = "General",
@@ -80,6 +98,16 @@ local options = {
           },
           order = 4,
         },
+        showWhen = {
+          type = "select",
+          name = "Show When",
+          values = {
+            always="Always",
+            inCombat="In Combat",
+            outOfCombat="Out of Combat",
+          },
+          order = 5,
+        },
       },
     },
 
@@ -109,27 +137,6 @@ local options = {
           type = "toggle",
           name = "Pop Animation",
           order = 4,
-        },
-      },
-    },
-
-    tools = {
-      type = "group",
-      name = "Tools",
-      order = 3,
-      args = {
-        preview = {
-          type = "execute",
-          name = "Toggle Preview",
-          order = 1,
-          func = function() CooldownCursor:Preview() end,
-        },
-        reset = {
-          type = "execute",
-          name = "Reset to Defaults",
-          order = 2,
-          confirm = true,
-          func = function() CooldownCursor:ResetSettings() end,
         },
       },
     },

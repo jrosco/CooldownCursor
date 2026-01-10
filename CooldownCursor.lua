@@ -873,6 +873,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     if name ~= addonName then return end
     self:ApplyDefaults()
     self:UpdateDisplay()
+    self:InitAce3Options()
     self:UnregisterEvent("ADDON_LOADED")
     return
   end

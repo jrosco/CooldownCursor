@@ -143,16 +143,16 @@ local defaults = {
   hideWhileMounted = false, -- hide when mounted
   anchor = ANCHOR_POSITION.TOPLEFT,
   anchorPadding = 2, -- distance from cursor
-  spellTextFont = "Default",
-  spellTextFontPath = DEFAULT_SYSTEM_FONTS["Default"],
+  spellTextFont = "Friz Quadrata TT",
+  spellTextFontPath = DEFAULT_SYSTEM_FONTS["Friz Quadrata TT"],
   spellTextSize = 14,
   spellTextFontType = FONT_TYPES.OUTLINE,
   spellTextColor = "#FFD100",
   spellTextAnchor = "TOP", -- or BOTTOM
   spellTextAlpha = 100,
-  cooldownTextFont = "Default",
-  cooldownTextFontPath = DEFAULT_SYSTEM_FONTS["Default"],
   cooldownTextSize = 20,
+  cooldownTextFont = "Friz Quadrata TT",
+  cooldownTextFontPath = DEFAULT_SYSTEM_FONTS["Friz Quadrata TT"],
   cooldownTextFontType = FONT_TYPES.OUTLINE,
   cooldownTextColor = "#FFFFFF",
   cooldownTextAnchor = CD_TEXT_ANCHOR_POINTS.CENTER.point,
@@ -426,10 +426,9 @@ function CooldownCursor:UpdateDisplay()
   icon.icon:SetShown(not CooldownCursorDB.iconHide)
 
   icon.icon:SetAlpha(
-    PercentToAlpha(CooldownCursorDB.iconAlpha)
+    PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
   )
 
-  local currentFontName = CooldownCursorDB.cooldownTextFont or defaults.cooldownTextFont
   -- Check for OmniCC presence
   local omniCC = self:IsOmniCCLoaded()
   if icon.cooldownText and icon.cooldownText:IsObjectType("FontString") and not omniCC then
@@ -441,7 +440,8 @@ function CooldownCursor:UpdateDisplay()
     )
     local cdr, cdg, cdb = HexToRGB(
     CooldownCursorDB.cooldownTextColor or defaults.cooldownTextColor)
-    local cdAlpha = PercentToAlpha(CooldownCursorDB.cooldownTextAlpha)
+    local cdAlpha = PercentToAlpha(CooldownCursorDB.cooldownTextAlpha or
+      defaults.cooldownTextAlpha)
     icon.cooldownText:SetTextColor(cdr, cdg, cdb, cdAlpha)
 
     -- Set Cooldown Text anchor position
@@ -468,7 +468,8 @@ function CooldownCursor:UpdateDisplay()
 
     local textr, textg, textb = HexToRGB(
       CooldownCursorDB.spellTextColor or defaults.spellTextColor)
-    local textAlpha = PercentToAlpha(CooldownCursorDB.spellTextAlpha)
+    local textAlpha = PercentToAlpha(CooldownCursorDB.spellTextAlpha or
+      defaults.spellTextAlpha)
     icon.text:SetTextColor(textr, textg, textb, textAlpha)
   end
 
@@ -499,7 +500,6 @@ function CooldownCursor:UpdateDisplay()
   )
 
   -- Refresh active live spell name
-  -- TODO: Is icon:IsShown() needed?
   if icon:IsShown() and activeSpellID then
     local info = C_Spell.GetSpellInfo(activeSpellID)
     if CooldownCursorDB.showSpellNames and info.name then
@@ -508,12 +508,6 @@ function CooldownCursor:UpdateDisplay()
     else
       icon.text:Hide()
     end
-  else
-    icon.text:Hide()
-  end
-
-  if icon:IsShown() then
-    UpdateCooldownIconFrame(icon)
   end
 
   -- Masque re-skin icon changes
@@ -547,13 +541,13 @@ local function HideIconNow()
   if CooldownCursorDB.fadeOutDuration == 0 then
     icon:Hide()
     icon.icon:SetAlpha(
-      PercentToAlpha(CooldownCursorDB.iconAlpha)
+      PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
     )
   else
     icon.fadeOut:Stop()
     fadeOut:SetDuration(tonumber(CooldownCursorDB.fadeOutDuration) or 0)
     icon.icon:SetAlpha(
-      PercentToAlpha(CooldownCursorDB.iconAlpha)
+      PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
     )
     icon.fadeOut:Play()
   end

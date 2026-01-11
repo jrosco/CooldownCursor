@@ -184,7 +184,10 @@ icon.cooldown:SetAllPoints(icon)
 icon.cooldown:SetDrawEdge(false)
 
 -- Cache the cooldown text region for later use
-icon.cooldownText = icon.cooldown:GetRegions()
+local cooldownRegion = icon.cooldown:GetRegions()
+if cooldownRegion and cooldownRegion:IsObjectType("FontString") then
+  icon.cooldownText = cooldownRegion
+end
 
 icon.text = icon:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 icon.text:SetPoint("BOTTOM", icon, "TOP", 0, 4)
@@ -431,7 +434,7 @@ function CooldownCursor:UpdateDisplay()
 
   -- Check for OmniCC presence
   local omniCC = self:IsOmniCCLoaded()
-  if icon.cooldownText and icon.cooldownText:IsObjectType("FontString") and not omniCC then
+  if icon.cooldownText and not omniCC then
     -- Set Cooldown text font and color
     icon.cooldownText:SetFont(CooldownCursorDB.cooldownTextFontPath or
       defaults.cooldownTextFontPath,

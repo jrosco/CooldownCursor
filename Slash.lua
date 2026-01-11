@@ -170,8 +170,8 @@ handlers.min = function(arg1)
 end
 
 handlers.mount = function()
-  local toggle = ToggleBool(CooldownCursor:GetDBValue("hideWhenMounted"))
-  CooldownCursor:SetDBBoolean("hideWhenMounted", toggle)
+  local toggle = ToggleBool(CooldownCursor:GetDBValue("hideWhileMounted"))
+  CooldownCursor:SetDBBoolean("hideWhileMounted", toggle)
   Print("hide while mounted is now", toggle and "enabled" or "disabled")
 end
 
@@ -348,7 +348,7 @@ end
 handlers.status = function()
   Print("Current Icon settings:")
   Print("   alpha:", CooldownCursor:GetDBValue("iconAlpha"))
-  Print("   anchor:", CooldownCursor:GetDBValue("iconAnchor"))
+  Print("   anchor:", CooldownCursor:GetDBValue("anchor"))
   Print("   animation:", CooldownCursor:GetDBValue("animation") and "on" or "off")
   Print("   cooldown swipe:", CooldownCursor:GetDBValue("showCooldownSwipe") and "on" or "off")
   Print("   fade out:", CooldownCursor:GetDBValue("fadeOutDuration"))
@@ -435,6 +435,4 @@ SlashCmdList["COOLDOWNCURSOR"] = function(msg)
   end
 
   fn(arg1, arg2)
-  -- Update Display after any command
-  CooldownCursor:UpdateDisplay()
 end

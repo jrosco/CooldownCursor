@@ -513,6 +513,9 @@ function CooldownCursor:UpdateDisplay()
   -- Masque re-skin icon changes
   if MasqueGroup then
     MasqueGroup:ReSkin()
+    if CooldownCursorDB.iconHide then
+      icon.icon:SetAlpha(0)
+    end
   end
 end
 

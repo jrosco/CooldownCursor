@@ -228,7 +228,7 @@ handlers.number = function(arg1, arg2)
       Print("/cdcursor fonts")
       return
     end
-    CooldownCursor:SetDBString("cooldownTextFont", font)
+    CooldownCursor:SetFontPath("cooldownTextFont", font)
     Print("cooldown number font set to:", font)
   elseif arg1 == "ftype" then
     local ftype = string.upper(arg2)
@@ -359,6 +359,7 @@ handlers.status = function()
   local show = CooldownCursor:GetDBValue("showWhen")
   local showLabel = (show == 0 and "always") or (show == 1 and "in-combat") or "out-of-combat"
   Print("   show mode:", show, "(", showLabel, ")")
+  Print("   hide while mounted:", CooldownCursor:GetDBValue("hideWhileMounted") and "enabled" or "disabled")
   Print("   size:", CooldownCursor:GetDBValue("iconSize"))
   Print("   OmniCC loaded:", CooldownCursor:IsOmniCCLoaded() and "yes" or "no")
   Print("Current Spelltext settings:")

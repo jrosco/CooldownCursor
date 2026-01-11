@@ -98,10 +98,12 @@ local SPELL_TEXT_ANCHOR_POINTS = {
 }
 
 local FONT_TYPES = {
+  NONE = nil,
   OUTLINE = "OUTLINE",
   THICKOUTLINE = "THICKOUTLINE",
   MONOCHROME = "MONOCHROME",
-  NONE = "NONE"
+  MONOCHROMEOUTLINE = "MONOCHROMEOUTLINE",
+  MONOCHROMETHICKOUTLINE = "MONOCHROMETHICKOUTLINE",
 }
 
 -- Default WoW fonts with descriptive names
@@ -368,11 +370,27 @@ end
 -- Internal Font Path helper
 --------------------------------------------------
 local function FontPath(fontName)
-  local path = DEFAULT_SYSTEM_FONTS[tostring(fontName)]
-  if LSM then
-    path = LSM:Fetch("font", tostring(fontName)) or path
+  local path = DEFAULT_SYSTEM_FONTS[tostring(fontName) or nil]
+  if LSM and path == nil then
+    path = LSM:Fetch("font", tostring(fontName))
   end
   return path
+end
+
+--------------------------------------------------
+--- Internal Apply Fonts helper
+--------------------------------------------------
+local function ApplyFonts(obj, path, size, flags)
+  if flags == "NONE" or flags == "" then
+    -- nil fonts flags are allowed and valid with obj:SetFont()
+    flags = nil
+  end
+
+  local applied = obj:SetFont(path, size, flags)
+  if not applied then
+    -- Hard fallback
+    obj:SetFont("Fonts\\FRIZQT__.TTF", size, nil)
+  end
 end
 
 ----------------------------------------------------
@@ -439,11 +457,13 @@ function CooldownCursor:UpdateDisplay()
   local omniCC = self:IsOmniCCLoaded()
   if icon.cooldownText and not omniCC then
     -- Set Cooldown text font and color
-    icon.cooldownText:SetFont(CooldownCursorDB.cooldownTextFontPath or
-      defaults.cooldownTextFontPath,
+    ApplyFonts(
+      icon.cooldownText,
+      CooldownCursorDB.cooldownTextFontPath or defaults.cooldownTextFontPath,
       CooldownCursorDB.cooldownTextSize or defaults.cooldownTextSize,
       CooldownCursorDB.cooldownTextFontType or defaults.cooldownTextFontType
     )
+
     local cdr, cdg, cdb = HexToRGB(
     CooldownCursorDB.cooldownTextColor or defaults.cooldownTextColor)
     local cdAlpha = PercentToAlpha(CooldownCursorDB.cooldownTextAlpha or
@@ -466,8 +486,9 @@ function CooldownCursor:UpdateDisplay()
 
   if icon.text then
     -- Set Spell Text font and color
-    icon.text:SetFont(CooldownCursorDB.spellTextFontPath or
-      defaults.spellTextFontPath,
+    ApplyFonts(
+      icon.text,
+      CooldownCursorDB.spellTextFontPath or defaults.spellTextFontPath,
       CooldownCursorDB.spellTextSize or defaults.spellTextSize,
       CooldownCursorDB.spellTextFontType or defaults.spellTextFontType
     )
@@ -689,7 +710,15 @@ end
 -- Validation font type
 function CooldownCursor:GetValidFontType(ftype)
   local fontType = string.upper(ftype)
-  return FONT_TYPES[fontType] ~= nil
+  if fontType == "NONE" then
+    -- nil fonts flags are allowed and valid with obj:SetFont()
+    -- FONT_TYPES["NONE"] is mapped to nil
+    return true
+  end
+  if FONT_TYPES[fontType] then
+    return true
+  end
+  return false
 end
 
 -- Validation anchor position

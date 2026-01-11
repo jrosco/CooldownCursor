@@ -235,7 +235,7 @@ handlers.number = function(arg1, arg2)
     local ftype = string.upper(arg2)
     if not CooldownCursor:GetValidFontType(ftype) then
       Print("invalid font type:", ftype)
-      Print("/cdcursor number ftype <outline||thickoutline||monochrome||none>")
+      Print("/cdcursor number ftype <outline||thickoutline||monochrome||monochromeoutline||monochromethickoutline||none>")
       return
     end
     CooldownCursor:SetDBString("cooldownTextFontType", ftype)
@@ -338,7 +338,7 @@ handlers.text = function(arg1, arg2)
     local ftype = string.upper(arg2)
     if not CooldownCursor:GetValidFontType(ftype) then
       Print("invalid font type:", ftype)
-      Print("/cdcursor text ftype <outline||thickoutline||monochrome||none>")
+      Print("/cdcursor text ftype <outline||thickoutline||monochrome||monochromeoutline||monochromethickoutline||none>")
       return
     end
     CooldownCursor:SetDBString("spellTextFontType", ftype)

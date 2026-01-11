@@ -379,6 +379,10 @@ handlers.status = function()
   Print("   size:", CooldownCursor:GetDBValue("cooldownTextSize"))
 end
 
+handlers.version = function()
+  Print("v" .. (CooldownCursor:GetVersion() or " unknown"))
+end
+
 ----------------------------------------------------
 --- Command Alias Handlers
 ----------------------------------------------------

@@ -128,6 +128,7 @@ local previewTicker = nil
 local defaults = {
   offsetX = 0, -- TODO: unused
   offsetY = 0, -- TODO: unused
+  scale = 1,
   iconSize = 48,
   iconAlpha = 100,
   iconHide = false,
@@ -378,15 +379,15 @@ end
 -- Cursor tracking and positioning
 ----------------------------------------------------
 local function UpdateCooldownIconFrame(self)
-  local scale = UIParent:GetEffectiveScale()
+  local uiScale  = UIParent:GetEffectiveScale()
   local cursorX, cursorY = GetCursorPosition()
 
-  local x = cursorX / scale
-  local y = cursorY / scale
+  local x = cursorX / uiScale
+  local y = cursorY / uiScale
 
-  local size = CooldownCursorDB.iconSize or 48
-  local pad  = CooldownCursorDB.anchorPadding or 8
-  local anchor = CooldownCursorDB.anchor or "TOP"
+  local size = CooldownCursorDB.iconSize or defaults.iconSize
+  local pad  = CooldownCursorDB.anchorPadding or defaults.anchorPadding
+  local anchor = CooldownCursorDB.anchor or defaults.anchor
 
   local screenW = UIParent:GetWidth()
   local screenH = UIParent:GetHeight()
@@ -417,7 +418,9 @@ local function UpdateCooldownIconFrame(self)
   ox, oy = AnchorOffsets(flipped, size, pad)
 
   self:ClearAllPoints()
-  self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x + ox, y + oy)
+  self:SetPoint("CENTER", UIParent, "BOTTOMLEFT",
+    x + ox * (CooldownCursorDB.scale or defaults.scale),
+    y + oy * (CooldownCursorDB.scale or defaults.scale))
 end
 
 ----------------------------------------------------
@@ -489,8 +492,14 @@ function CooldownCursor:UpdateDisplay()
     anchorPoint.y
   )
 
-  -- Set icon size
-  icon:SetSize(CooldownCursorDB.iconSize, CooldownCursorDB.iconSize)
+  -- Set icon size and scale
+  -- Don't scale with icon.icon:SetScale() as it messes with cursor position calculations
+  icon:SetSize(CooldownCursorDB.iconSize * (CooldownCursorDB.scale or defaults.scale),
+    CooldownCursorDB.iconSize * (CooldownCursorDB.scale or defaults.scale))
+
+  -- Set all other scale settings
+  icon.text:SetScale(CooldownCursorDB.scale or defaults.scale)
+  icon.cooldown:SetScale(CooldownCursorDB.scale or defaults.scale)
 
   -- Hide countdown numbers when enabled
   icon.cooldown:SetHideCountdownNumbers(
@@ -557,6 +566,7 @@ local function HideIconNow()
     )
     icon.fadeOut:Play()
   end
+
 end
 
 ----------------------------------------------------

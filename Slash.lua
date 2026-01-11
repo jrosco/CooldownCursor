@@ -48,6 +48,7 @@ local function Help()
  /cdcursor icon                     - Configure icon settings (submenu)
  /cdcursor text                     - Configure spellname text settings (submenu)
  /cdcursor number                   - Configure cooldown number settings (submenu)
+ /cdcursor scale                    - Set scale of icon and texts
  /cdcursor animation                - Toggle icon animation on/off
  /cdcursor fadeout                  - Set icon fade-out duration in seconds
  /cdcursor hideafter                - Set icon hide-after duration in seconds
@@ -263,6 +264,17 @@ handlers.reset = function()
   Print("settings reset to default.")
 end
 
+handlers.scale = function(arg1)
+  local n = ToNum(arg1)
+  if not n then return Usage("/cdcursor scale <0-3>") end
+  if n <= 0 or n >= 3 then
+    Print("scale must be greater than 0 and less than 3")
+    return
+  end
+  CooldownCursor:SetDBNumber("scale", n)
+  Print("scale set to:", n)
+end
+
 handlers.show = function(arg1)
   local n = ToNum(arg1)
   if n ~= 0 and n ~= 1 and n ~= 2 then
@@ -361,6 +373,7 @@ handlers.status = function()
   Print("   show mode:", show, "(", showLabel, ")")
   Print("   hide while mounted:", CooldownCursor:GetDBValue("hideWhileMounted") and "enabled" or "disabled")
   Print("   size:", CooldownCursor:GetDBValue("iconSize"))
+  Print("   scale:", CooldownCursor:GetDBValue("scale"))
   Print("   OmniCC loaded:", CooldownCursor:IsOmniCCLoaded() and "yes" or "no")
   Print("Current Spelltext settings:")
   Print("   alpha:", CooldownCursor:GetDBValue("spellTextAlpha"))

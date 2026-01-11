@@ -80,8 +80,8 @@ handlers.anchors = function()
 end
 
 handlers.animation = function()
-  local toggle = ToggleBool(CooldownCursorDB.animation)
-  CooldownCursor:SetAnimation(toggle)
+  local toggle = ToggleBool(CooldownCursor:GetDBValue("animation"))
+  CooldownCursor:SetDBBoolean("animation", toggle)
   Print("animation set to:", toggle and "on" or "off")
 end
 
@@ -122,7 +122,7 @@ handlers.icon = function(arg1, arg2)
   if arg1 == "alpha" then
     local n = ToNum(arg2)
     if not n then return Usage("/cdcursor icon alpha <number>") end
-    CooldownCursor:SetIconAlpha(n)
+    CooldownCursor:SetDBNumber("iconAlpha", n)
     Print("icon alpha set to:", n)
   elseif arg1 == "anchor" then
     local pos = string.upper(arg2)
@@ -133,20 +133,20 @@ handlers.icon = function(arg1, arg2)
       handlers.anchors()
       return
     end
-    CooldownCursor:SetAnchor(pos)
+    CooldownCursor:SetDBString("anchor", pos)
     Print("anchor set to:", pos)
   elseif arg1 == "size" then
      local n = ToNum(arg2)
      if not n then return Usage("/cdcursor icon size <number>") end
-     CooldownCursor:SetIconSize(n)
+     CooldownCursor:SetDBNumber("iconSize", n)
      Print("icon size set to:", n)
   elseif arg1 == "swipe" then
-    local toggle = ToggleBool(CooldownCursorDB.showCooldownSwipe)
-    CooldownCursor:SetShowCooldownSwipe(toggle)
+    local toggle = ToggleBool(CooldownCursor:GetDBValue("showCooldownSwipe"))
+    CooldownCursor:SetDBBoolean("showCooldownSwipe", toggle)
     Print("swipe set to:", toggle and "on" or "off")
   elseif arg1 == "toggle" then
-    local toggle = ToggleBool(CooldownCursorDB.iconHide)
-    CooldownCursor:SetIconHide(toggle)
+    local toggle = ToggleBool(CooldownCursor:GetDBValue("iconHide"))
+    CooldownCursor:SetDBBoolean("iconHide", toggle)
     Print("icon is now", toggle and "hidden" or "shown")
   else
     Usage("/cdcursor icon <alpha||anchor||size||swipe||toggle>")
@@ -157,7 +157,7 @@ end
 handlers.max = function(arg1)
   local n = ToNum(arg1)
   if not n then return Usage("/cdcursor max <seconds>") end
-  CooldownCursor:SetMaxDuration(n)
+  CooldownCursor:SetDBNumber("maxDuration", n)
   Print("cooldown max duration:", n)
 end
 
@@ -165,13 +165,13 @@ end
 handlers.min = function(arg1)
   local n = ToNum(arg1)
   if not n then return Usage("/cdcursor min <seconds>") end
-  CooldownCursor:SetMinDuration(n)
+  CooldownCursor:SetDBNumber("minDuration", n)
   Print("cooldown min duration:", n)
 end
 
 handlers.mount = function()
-  local toggle = ToggleBool(CooldownCursorDB.hideWhileMounted)
-  CooldownCursor:SetHideWhenMounted(toggle)
+  local toggle = ToggleBool(CooldownCursor:GetDBValue("hideWhenMounted"))
+  CooldownCursor:SetDBBoolean("hideWhenMounted", toggle)
   Print("hide while mounted is now", toggle and "enabled" or "disabled")
 end
 
@@ -197,7 +197,7 @@ handlers.number = function(arg1, arg2)
   if arg1 == "alpha" then
     local n = ToNum(arg2)
     if not n then return Usage("/cdcursor number alpha <number>") end
-    CooldownCursor:SetCooldownTextAlpha(n)
+    CooldownCursor:SetDBNumber("cooldownTextAlpha", n)
     Print("cooldown number alpha set to:", n)
   elseif arg1 == "anchor" then
     local pos = string.upper(arg2)
@@ -208,10 +208,10 @@ handlers.number = function(arg1, arg2)
       handlers.anchors()
       return
     end
-    CooldownCursor:SetCooldownTextAnchor(pos)
+    CooldownCursor:SetDBString("cooldownTextAnchor", pos)
     Print("cooldown number anchor set to:", pos)
   elseif arg1 == "color" then
-    CooldownCursor:SetCooldownTextColor(arg2)
+    CooldownCursor:SetDBString("cooldownTextColor", arg2)
     Print("cooldown number color set to:", arg2)
   elseif arg1 == "font" then
     local font = arg2
@@ -228,7 +228,7 @@ handlers.number = function(arg1, arg2)
       Print("/cdcursor fonts")
       return
     end
-    CooldownCursor:SetCooldownTextFont(font)
+    CooldownCursor:SetDBString("cooldownTextFont", font)
     Print("cooldown number font set to:", font)
   elseif arg1 == "ftype" then
     local ftype = string.upper(arg2)
@@ -237,16 +237,16 @@ handlers.number = function(arg1, arg2)
       Print("/cdcursor number ftype <outline||thickoutline||monochrome||none>")
       return
     end
-    CooldownCursor:SetCooldownTextFontType(ftype)
+    CooldownCursor:SetDBString("cooldownTextFontType", ftype)
     Print("cooldown number font type set to:", ftype)
   elseif arg1 == "size" then
     local n = ToNum(arg2)
     if not n then return Usage("/cdcursor number size <number>") end
-    CooldownCursor:SetCooldownTextSize(n)
+    CooldownCursor:SetDBNumber("cooldownTextSize", n)
     Print("cooldown number size set to:", n)
   elseif arg1 == "toggle" then
-    local toggle = ToggleBool(CooldownCursorDB.hideCooldownNumbers)
-    CooldownCursor:SetHideCooldownNumbers(toggle)
+    local toggle = ToggleBool(CooldownCursor:GetDBValue("hideCooldownNumbers"))
+    CooldownCursor:SetDBBoolean("hideCooldownNumbers", toggle)
     Print("cooldown numbers now",toggle and "hidden" or "shown")
   else
     Usage("/cdcursor number <alpha||anchor||color||font||ftype||size||toggle>")
@@ -268,7 +268,7 @@ handlers.show = function(arg1)
   if n ~= 0 and n ~= 1 and n ~= 2 then
     return Usage("/cdcursor show <0||1||2>   (0=always, 1=in-combat, 2=out-of-combat)")
   end
-  CooldownCursor:SetShowWhen(n)
+  CooldownCursor:SetDBNumber("showWhen", n)
   local label = (n == 0 and "always") or (n == 1 and "in-combat") or "out-of-combat"
   Print("show mode set to:", label)
 end
@@ -290,7 +290,7 @@ handlers.text = function(arg1, arg2)
   if arg1 == "alpha" then
     local n = ToNum(arg2)
     if not n then return Usage("/cdcursor text alpha <number>") end
-    CooldownCursor:SetSpellTextAlpha(n)
+    CooldownCursor:SetDBNumber("spellTextAlpha", n)
     Print("spell text alpha set to:", n)
   elseif arg1 == "anchor" then
     local pos = string.upper(arg2)
@@ -300,10 +300,10 @@ handlers.text = function(arg1, arg2)
       Print("/cdcursor text anchor <top||bottom>")
       return
     end
-    CooldownCursor:SetSpellTextAnchor(pos)
+    CooldownCursor:SetDBString("spellTextAnchor", pos)
     Print("spell text anchor set to:", pos)
   elseif arg1 == "color" then
-    CooldownCursor:SetSpellTextColor(arg2)
+    CooldownCursor:SetDBString("spellTextColor", arg2)
     Print("spell text color set to:", arg2)
   elseif arg1 == "font" then
     local font = arg2
@@ -320,7 +320,7 @@ handlers.text = function(arg1, arg2)
       Print("/cdcursor fonts")
       return
     end
-    CooldownCursor:SetSpellTextFont(arg2)
+    CooldownCursor:SetFontPath("spellTextFont", arg2)
     Print("spell text font set to:", arg2)
   elseif arg1 == "ftype" then
     local ftype = string.upper(arg2)
@@ -329,16 +329,16 @@ handlers.text = function(arg1, arg2)
       Print("/cdcursor text ftype <outline||thickoutline||monochrome||none>")
       return
     end
-    CooldownCursor:SetSpellTextFontType(ftype)
+    CooldownCursor:SetDBString("spellTextFontType", ftype)
     Print("spell text font type set to:", ftype)
   elseif arg1 == "size" then
     local n = ToNum(arg2)
     if not n then return Usage("/cdcursor text size <number>") end
-    CooldownCursor:SetSpellTextSize(n)
+    CooldownCursor:SetDBNumber("spellTextSize", n)
     Print("spell text size set to:", n)
   elseif arg1 == "toggle" then
-    local toggle = ToggleBool(CooldownCursorDB.showSpellNames)
-    CooldownCursor:SetShowSpellNames(toggle)
+    local toggle = ToggleBool(CooldownCursor:GetDBValue("showSpellNames"))
+    CooldownCursor:SetDBBoolean("showSpellNames", toggle)
     Print("spell names now", toggle and "on" or "off")
   else
     Usage("/cdcursor text <alpha||anchor||color||font||ftype||size||toggle>")
@@ -347,37 +347,36 @@ end
 
 handlers.status = function()
   Print("Current Icon settings:")
-  Print("   alpha:", CooldownCursorDB.iconAlpha)
-  Print("   anchor:", CooldownCursorDB.anchor or "CENTER")
-  Print("   animation:", CooldownCursorDB.animation and "on" or "off")
-  Print("   cooldown swipe:", CooldownCursorDB.showCooldownSwipe and "on" or "off")
-  Print("   fade out:", CooldownCursorDB.fadeOutDuration)
-  Print("   hide after:", CooldownCursorDB.hideAfter)
-  Print("   hide cooldown numbers:", CooldownCursorDB.hideCooldownNumbers and "on" or "off")
-  Print("   icon:", CooldownCursorDB.iconHide and "hidden" or "shown")
-  Print("   hide while mounted:", CooldownCursorDB.hideWhileMounted and "enabled" or "disabled")
-  Print("   show spell names:", CooldownCursorDB.showSpellNames and "on" or "off")
-  local show = CooldownCursorDB.showWhen
+  Print("   alpha:", CooldownCursor:GetDBValue("iconAlpha"))
+  Print("   anchor:", CooldownCursor:GetDBValue("iconAnchor"))
+  Print("   animation:", CooldownCursor:GetDBValue("animation") and "on" or "off")
+  Print("   cooldown swipe:", CooldownCursor:GetDBValue("showCooldownSwipe") and "on" or "off")
+  Print("   fade out:", CooldownCursor:GetDBValue("fadeOutDuration"))
+  Print("   hide after:", CooldownCursor:GetDBValue("hideAfter"))
+  Print("   hide cooldown numbers:", CooldownCursor:GetDBValue("hideCooldownNumbers") and "on" or "off")
+  Print("   icon:", CooldownCursor:GetDBValue("iconHide") and "hidden" or "shown")
+  Print("   show spell names:", CooldownCursor:GetDBValue("showSpellNames") and "on" or "off")
+  local show = CooldownCursor:GetDBValue("showWhen")
   local showLabel = (show == 0 and "always") or (show == 1 and "in-combat") or "out-of-combat"
   Print("   show mode:", show, "(", showLabel, ")")
-  Print("   size:", CooldownCursorDB.iconSize)
+  Print("   size:", CooldownCursor:GetDBValue("iconSize"))
   Print("   OmniCC loaded:", CooldownCursor:IsOmniCCLoaded() and "yes" or "no")
   Print("Current Spelltext settings:")
-  Print("   alpha:", CooldownCursorDB.spellTextAlpha)
-  Print("   anchor:", CooldownCursorDB.spellTextAnchor)
-  Print("   color:", CooldownCursorDB.spellTextColor)
-  Print("   font:", CooldownCursorDB.spellTextFont)
-  Print("   font path:", CooldownCursorDB.spellTextFontPath)
-  Print("   ftype:", CooldownCursorDB.spellTextFontType)
-  Print("   size:", CooldownCursorDB.spellTextSize)
+  Print("   alpha:", CooldownCursor:GetDBValue("spellTextAlpha"))
+  Print("   anchor:", CooldownCursor:GetDBValue("spellTextAnchor"))
+  Print("   color:", CooldownCursor:GetDBValue("spellTextColor"))
+  Print("   font:", CooldownCursor:GetDBValue("spellTextFont"))
+  Print("   font path:", CooldownCursor:GetDBValue("spellTextFontPath"))
+  Print("   ftype:", CooldownCursor:GetDBValue("spellTextFontType"))
+  Print("   size:", CooldownCursor:GetDBValue("spellTextSize"))
   Print("Current Cooldown text settings:")
-  Print("   alpha:", CooldownCursorDB.cooldownTextAlpha)
-  Print("   anchor:", CooldownCursorDB.cooldownTextAnchor)
-  Print("   color:", CooldownCursorDB.cooldownTextColor)
-  Print("   font:", CooldownCursorDB.cooldownTextFont)
-  Print("   font path:", CooldownCursorDB.cooldownTextFontPath)
-  Print("   ftype:", CooldownCursorDB.cooldownTextFontType)
-  Print("   size:", CooldownCursorDB.cooldownTextSize)
+  Print("   alpha:", CooldownCursor:GetDBValue("cooldownTextAlpha"))
+  Print("   anchor:", CooldownCursor:GetDBValue("cooldownTextAnchor"))
+  Print("   color:", CooldownCursor:GetDBValue("cooldownTextColor"))
+  Print("   font:", CooldownCursor:GetDBValue("cooldownTextFont"))
+  Print("   font path:", CooldownCursor:GetDBValue("cooldownTextFontPath"))
+  Print("   ftype:", CooldownCursor:GetDBValue("cooldownTextFontType"))
+  Print("   size:", CooldownCursor:GetDBValue("cooldownTextSize"))
 end
 
 ----------------------------------------------------

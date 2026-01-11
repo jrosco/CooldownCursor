@@ -586,18 +586,64 @@ end
 ----------------------------------------------------
 -- Settings API
 ----------------------------------------------------
+
+-- Get addon version from metadata
+function CooldownCursor:GetVersion()
+  return C_AddOns.GetAddOnMetadata(addonName, "Version")
+end
+
+-- Get addon version from metadata
+function CooldownCursor:GetAuthor()
+  return C_AddOns.GetAddOnMetadata(addonName, "Author")
+end
+
+-- Get addon notes from metadata
+function CooldownCursor:GetNotes()
+  return C_AddOns.GetAddOnMetadata(addonName, "Notes")
+end
+
+-- Get a value from the SavedVariables table
+function CooldownCursor:GetDBValue(key)
+  return CooldownCursorDB[key] or defaults[key]
+end
+
+-- Set a string value in the SavedVariables table
+function CooldownCursor:SetDBString(key, value)
+  CooldownCursorDB[key] = string.format("%s", value)
+  self:UpdateDisplay()
+end
+
+-- Set a numeric value in the SavedVariables table
+function CooldownCursor:SetDBNumber(key, value)
+  CooldownCursorDB[key] = tonumber(value)
+  self:UpdateDisplay()
+end
+
+-- Set a boolean value in the SavedVariables table
+function CooldownCursor:SetDBBoolean(key, value)
+  CooldownCursorDB[key] = value and true or false
+  self:UpdateDisplay()
+end
+
+-- Set font names and paths in the SavedVariables table
+function CooldownCursor:SetFontPath(key, value)
+  CooldownCursorDB[key] = value
+  CooldownCursorDB[key .. "Path"] = FontPath(
+    CooldownCursorDB[key])
+  self:UpdateDisplay()
+end
+
+-- Get list of all available fonts
 function CooldownCursor:GetAllFonts()
   return FontNames()
 end
 
+-- Get list of valid font types
 function CooldownCursor:GetValidFontTypes()
-  local fontTypes = {}
-  for k, v in pairs(FONT_TYPES) do
-    table.insert(fontTypes, k)
-  end
-  return fontTypes
+  return FONT_TYPES
 end
 
+-- Get list of valid anchor positions
 function CooldownCursor:GetValidAnchorPositions()
   local positions = {}
   for k, v in pairs(ANCHOR_POSITION) do
@@ -606,6 +652,7 @@ function CooldownCursor:GetValidAnchorPositions()
   return positions
 end
 
+-- Get list of valid spell text anchor positions
 function CooldownCursor:GetValidSpellTextAnchorPositions()
   local positions = {}
   for k, v in pairs(SPELL_TEXT_ANCHOR_POINTS) do
@@ -614,6 +661,7 @@ function CooldownCursor:GetValidSpellTextAnchorPositions()
   return positions
 end
 
+-- Get list of valid cooldown text anchor positions
 function CooldownCursor:GetValidCooldownTextAnchorPositions()
   local positions = {}  
   for k, v in pairs(CD_TEXT_ANCHOR_POINTS) do
@@ -622,122 +670,28 @@ function CooldownCursor:GetValidCooldownTextAnchorPositions()
   return positions
 end
 
+-- Validation font type
 function CooldownCursor:GetValidFontType(ftype)
   local fontType = string.upper(ftype)
   return FONT_TYPES[fontType] ~= nil
 end
 
+-- Validation anchor position
 function CooldownCursor:GetValidAnchorPosition(pos)
   local anchor = string.upper(pos)
   return ANCHOR_POSITION[anchor] ~= nil
 end
 
+-- Validation anchor position
 function CooldownCursor:GetValidSpellTextAnchorPosition(pos)
   local anchor = string.upper(pos)
   return SPELL_TEXT_ANCHOR_POINTS[anchor] ~= nil
 end
 
+-- Validation cooldown text anchor position
 function CooldownCursor:GetValidCooldownTextAnchorPosition(pos)
   local anchor = string.upper(pos)
   return CD_TEXT_ANCHOR_POINTS[anchor] ~= nil
-end
-
-function CooldownCursor:SetSpellTextFont(fontName)
-  CooldownCursorDB.spellTextFont = fontName
-    or defaults.spellTextFont
-  CooldownCursorDB.spellTextFontPath = FontPath(
-    CooldownCursorDB.spellTextFont or defaults.spellTextFont)
-end
-
-function CooldownCursor:SetSpellTextSize(size)
-  CooldownCursorDB.spellTextSize = tonumber(size)
-    or defaults.spellTextSize
-end
-
-function CooldownCursor:SetSpellTextFontType(ftype)
-  CooldownCursorDB.spellTextFontType = ftype
-    or defaults.spellTextFontType
-end
-
-function CooldownCursor:SetSpellTextColor(colorHex)
-  CooldownCursorDB.spellTextColor = colorHex
-    or defaults.spellTextColor
-end
-
-function CooldownCursor:SetSpellTextAnchor(anchor)
-  CooldownCursorDB.spellTextAnchor = string.upper(
-    anchor or defaults.spellTextAnchor)
-end
-
-function CooldownCursor:SetSpellTextAlpha(alpha)
-  CooldownCursorDB.spellTextAlpha = tonumber(alpha) or defaults.spellTextAlpha
-end
-
-function CooldownCursor:SetCooldownTextFont(fontName)
-  CooldownCursorDB.cooldownTextFont = fontName
-    or defaults.cooldownTextFont
-  CooldownCursorDB.cooldownTextFontPath = FontPath(
-    CooldownCursorDB.cooldownTextFont or defaults.cooldownTextFont)
-end
-
-function CooldownCursor:SetCooldownTextSize(size)
-  CooldownCursorDB.cooldownTextSize = tonumber(size)
-    or defaults.cooldownTextSize
-end
-
-function CooldownCursor:SetCooldownTextFontType(ftype)
-  CooldownCursorDB.cooldownTextFontType = ftype
-    or defaults.cooldownTextFontType
-end
-
-function CooldownCursor:SetCooldownTextColor(colorHex)
-  CooldownCursorDB.cooldownTextColor = colorHex
-    or defaults.cooldownTextColor
-end
-
-function CooldownCursor:SetCooldownTextAnchor(anchor)
-  CooldownCursorDB.cooldownTextAnchor = string.upper(
-  anchor or defaults.cooldownTextAnchor)
-end
-
-function CooldownCursor:SetCooldownTextAlpha(alpha)
-  CooldownCursorDB.cooldownTextAlpha = tonumber(alpha) or defaults.cooldownTextAlpha
-end
-
-function CooldownCursor:SetIconSize(size)
-  CooldownCursorDB.iconSize = tonumber(size) or defaults.iconSize
-end
-
-function CooldownCursor:SetShowSpellNames(enabled)
-  CooldownCursorDB.showSpellNames = enabled
-end
-
-function CooldownCursor:SetHideCooldownNumbers(enabled)
-  CooldownCursorDB.hideCooldownNumbers = enabled
-end
-
-function CooldownCursor:SetIconAlpha(alpha)
-  CooldownCursorDB.iconAlpha = tonumber(alpha) or defaults.iconAlpha
-end
-
-function CooldownCursor:SetIconHide(enabled)
-  CooldownCursorDB.iconHide = enabled
-end
-
-function CooldownCursor:SetShowCooldownSwipe(enabled)
-  CooldownCursorDB.showCooldownSwipe = enabled
-end
-
-function CooldownCursor:SetAnchor(anchor)
-  CooldownCursorDB.anchor = string.upper(anchor or defaults.anchor)
-end
-
-function CooldownCursor:SetMinDuration(seconds)
-  CooldownCursorDB.minDuration = tonumber(seconds) or defaults.minDuration
-end
-
-function CooldownCursor:SetMaxDuration(seconds)
-  CooldownCursorDB.maxDuration = tonumber(seconds) or defaults.maxDuration
 end
 
 function CooldownCursor:SetHideAfter(seconds)
@@ -748,24 +702,12 @@ function CooldownCursor:SetHideAfter(seconds)
   end
 end
 
-function CooldownCursor:SetAnimation(enabled)
-  CooldownCursorDB.animation = enabled
-end
-
 function CooldownCursor:SetFadeOutDuration(seconds)
   CooldownCursorDB.fadeOutDuration = tonumber(seconds) or defaults.fadeOutDuration
   -- If icon currently visible, re-arm timer using new value 
-  -- if icon:IsShown() and not previewActive then
-  --   HideIconNow()
-  -- end
-end
-
-function CooldownCursor:SetShowWhen(state)
-  CooldownCursorDB.showWhen = state
-end
-
-function CooldownCursor:SetHideWhenMounted(state)
-  CooldownCursorDB.hideWhileMounted = state
+  if icon:IsShown() and not previewActive then
+    HideIconNow()
+  end
 end
 
 function CooldownCursor:ResetSettings()

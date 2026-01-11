@@ -14,6 +14,15 @@ end
 local fontValues = {}
 local anchorValues = {}
 
+local fontTypeValues = {
+  NONE = "None",
+  OUTLINE = "Outline",
+  THICKOUTLINE = "Thick Outline",
+  MONOCHROME = "Monochrome",
+  MONOCHROMEOUTLINE = "Monochrome Outline",
+  MONOCHROMETHICKOUTLINE = "Monochrome Thick Outline",
+}
+
 local function AnchorValues()
   if next(anchorValues) ~= nil then
     -- return cached values
@@ -240,10 +249,10 @@ local options = {
           type = "select",
           name = "Font Type",
           order = 6,
-          values = CooldownCursor:GetValidFontTypes(),
+          values = fontTypeValues,
           get = function() return (CooldownCursor:GetDBValue("spellTextFontType")) end,
           set = function(_, v)
-            if CooldownCursor.GetValidFontType and not CooldownCursor:GetValidFontType(v) then return end
+            -- if CooldownCursor.GetValidFontType and not CooldownCursor:GetValidFontType(v) then return end
             CooldownCursor:SetDBString("spellTextFontType", v)
           end,
         },
@@ -334,10 +343,10 @@ local options = {
           name = "Font Type",
           order = 6,
           disabled = function() return CooldownCursor:IsOmniCCLoaded() end,
-          values = CooldownCursor:GetValidFontTypes(),
+          values = fontTypeValues,
           get = function() return (CooldownCursor:GetDBValue("cooldownTextFontType") or "OUTLINE") end,
           set = function(_, v)
-            if CooldownCursor.GetValidFontType and not CooldownCursor:GetValidFontType(v) then return end
+            -- if CooldownCursor.GetValidFontType and not CooldownCursor:GetValidFontType(v) then return end
             CooldownCursor:SetDBString("cooldownTextFontType", v)
           end,
         },

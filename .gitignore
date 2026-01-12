@@ -40,3 +40,5 @@ luac.out
 *.hex
 
 .vscode/settings.json
+Libs/
+dont_commit/

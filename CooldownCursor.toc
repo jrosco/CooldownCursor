@@ -1,8 +1,8 @@
 ## Interface: 110207, 120000, 120001
 ## Title: CooldownCursor
-## Notes: Shows failed spell cooldowns at the mouse cursor
+## Notes: Shows cooldown timers at your cursor position
 ## Author: jrosco
-## Version: 0.1.0
+## Version: 0.1.1
 ## SavedVariables: CooldownCursorDB
 ## OptionalDeps: Masque
 

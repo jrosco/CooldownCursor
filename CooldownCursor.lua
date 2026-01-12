@@ -96,10 +96,12 @@ local SPELL_TEXT_ANCHOR_POINTS = {
 }
 
 local FONT_TYPES = {
+  NONE = nil,
   OUTLINE = "OUTLINE",
   THICKOUTLINE = "THICKOUTLINE",
   MONOCHROME = "MONOCHROME",
-  NONE = "NONE"
+  MONOCHROMEOUTLINE = "MONOCHROMEOUTLINE",
+  MONOCHROMETHICKOUTLINE = "MONOCHROMETHICKOUTLINE",
 }
 
 -- Default WoW fonts with descriptive names
@@ -126,6 +128,7 @@ local previewTicker = nil
 local defaults = {
   offsetX = 0, -- TODO: unused
   offsetY = 0, -- TODO: unused
+  scale = 1,
   iconSize = 48,
   iconAlpha = 100,
   iconHide = false,
@@ -138,18 +141,19 @@ local defaults = {
   maxDuration = 600, -- TODO: remove in midnight
   fadeOutDuration = 0,
   showWhen = SHOW_WHEN_STATE.ALWAYS, -- 0=always, 1=in-combat, 2=out-of-combat
+  hideWhileMounted = false, -- hide when mounted
   anchor = ANCHOR_POSITION.TOPLEFT,
   anchorPadding = 2, -- distance from cursor
-  spellTextFont = "Default",
-  spellTextFontPath = DEFAULT_SYSTEM_FONTS["Default"],
+  spellTextFont = "Friz Quadrata TT",
+  spellTextFontPath = DEFAULT_SYSTEM_FONTS["Friz Quadrata TT"],
   spellTextSize = 14,
   spellTextFontType = FONT_TYPES.OUTLINE,
   spellTextColor = "#FFD100",
   spellTextAnchor = "TOP", -- or BOTTOM
   spellTextAlpha = 100,
-  cooldownTextFont = "Default",
-  cooldownTextFontPath = DEFAULT_SYSTEM_FONTS["Default"],
-  cooldownTextSize = 16,
+  cooldownTextSize = 20,
+  cooldownTextFont = "Friz Quadrata TT",
+  cooldownTextFontPath = DEFAULT_SYSTEM_FONTS["Friz Quadrata TT"],
   cooldownTextFontType = FONT_TYPES.OUTLINE,
   cooldownTextColor = "#FFFFFF",
   cooldownTextAnchor = CD_TEXT_ANCHOR_POINTS.CENTER.point,
@@ -181,7 +185,10 @@ icon.cooldown:SetAllPoints(icon)
 icon.cooldown:SetDrawEdge(false)
 
 -- Cache the cooldown text region for later use
-icon.cooldownText = icon.cooldown:GetRegions()
+local cooldownRegion = icon.cooldown:GetRegions()
+if cooldownRegion and cooldownRegion:IsObjectType("FontString") then
+  icon.cooldownText = cooldownRegion
+end
 
 icon.text = icon:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 icon.text:SetPoint("BOTTOM", icon, "TOP", 0, 4)
@@ -361,26 +368,42 @@ end
 -- Internal Font Path helper
 --------------------------------------------------
 local function FontPath(fontName)
-  local path = DEFAULT_SYSTEM_FONTS[tostring(fontName)]
-  if LSM then
-    path = LSM:Fetch("font", tostring(fontName)) or path
+  local path = DEFAULT_SYSTEM_FONTS[tostring(fontName) or nil]
+  if LSM and path == nil then
+    path = LSM:Fetch("font", tostring(fontName))
   end
   return path
+end
+
+--------------------------------------------------
+--- Internal Apply Fonts helper
+--------------------------------------------------
+local function ApplyFonts(obj, path, size, flags)
+  if flags == "NONE" or flags == "" then
+    -- nil fonts flags are allowed and valid with obj:SetFont()
+    flags = nil
+  end
+
+  local applied = obj:SetFont(path, size, flags)
+  if not applied then
+    -- Hard fallback
+    obj:SetFont("Fonts\\FRIZQT__.TTF", size, nil)
+  end
 end
 
 ----------------------------------------------------
 -- Cursor tracking and positioning
 ----------------------------------------------------
 local function UpdateCooldownIconFrame(self)
-  local scale = UIParent:GetEffectiveScale()
+  local uiScale  = UIParent:GetEffectiveScale()
   local cursorX, cursorY = GetCursorPosition()
 
-  local x = cursorX / scale
-  local y = cursorY / scale
+  local x = cursorX / uiScale
+  local y = cursorY / uiScale
 
-  local size = CooldownCursorDB.iconSize or 48
-  local pad  = CooldownCursorDB.anchorPadding or 8
-  local anchor = CooldownCursorDB.anchor or "TOP"
+  local size = CooldownCursorDB.iconSize or defaults.iconSize
+  local pad  = CooldownCursorDB.anchorPadding or defaults.anchorPadding
+  local anchor = CooldownCursorDB.anchor or defaults.anchor
 
   local screenW = UIParent:GetWidth()
   local screenH = UIParent:GetHeight()
@@ -411,7 +434,9 @@ local function UpdateCooldownIconFrame(self)
   ox, oy = AnchorOffsets(flipped, size, pad)
 
   self:ClearAllPoints()
-  self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x + ox, y + oy)
+  self:SetPoint("CENTER", UIParent, "BOTTOMLEFT",
+    x + ox * (CooldownCursorDB.scale or defaults.scale),
+    y + oy * (CooldownCursorDB.scale or defaults.scale))
 end
 
 ----------------------------------------------------
@@ -423,22 +448,24 @@ function CooldownCursor:UpdateDisplay()
   icon.icon:SetShown(not CooldownCursorDB.iconHide)
 
   icon.icon:SetAlpha(
-    PercentToAlpha(CooldownCursorDB.iconAlpha)
+    PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
   )
 
-  local currentFontName = CooldownCursorDB.cooldownTextFont or defaults.cooldownTextFont
   -- Check for OmniCC presence
   local omniCC = self:IsOmniCCLoaded()
-  if icon.cooldownText and icon.cooldownText:IsObjectType("FontString") and not omniCC then
+  if icon.cooldownText and not omniCC then
     -- Set Cooldown text font and color
-    icon.cooldownText:SetFont(CooldownCursorDB.cooldownTextFontPath or
-      defaults.cooldownTextFontPath,
+    ApplyFonts(
+      icon.cooldownText,
+      CooldownCursorDB.cooldownTextFontPath or defaults.cooldownTextFontPath,
       CooldownCursorDB.cooldownTextSize or defaults.cooldownTextSize,
       CooldownCursorDB.cooldownTextFontType or defaults.cooldownTextFontType
     )
+
     local cdr, cdg, cdb = HexToRGB(
     CooldownCursorDB.cooldownTextColor or defaults.cooldownTextColor)
-    local cdAlpha = PercentToAlpha(CooldownCursorDB.cooldownTextAlpha)
+    local cdAlpha = PercentToAlpha(CooldownCursorDB.cooldownTextAlpha or
+      defaults.cooldownTextAlpha)
     icon.cooldownText:SetTextColor(cdr, cdg, cdb, cdAlpha)
 
     -- Set Cooldown Text anchor position
@@ -457,15 +484,17 @@ function CooldownCursor:UpdateDisplay()
 
   if icon.text then
     -- Set Spell Text font and color
-    icon.text:SetFont(CooldownCursorDB.spellTextFontPath or
-      defaults.spellTextFontPath,
+    ApplyFonts(
+      icon.text,
+      CooldownCursorDB.spellTextFontPath or defaults.spellTextFontPath,
       CooldownCursorDB.spellTextSize or defaults.spellTextSize,
       CooldownCursorDB.spellTextFontType or defaults.spellTextFontType
     )
 
     local textr, textg, textb = HexToRGB(
       CooldownCursorDB.spellTextColor or defaults.spellTextColor)
-    local textAlpha = PercentToAlpha(CooldownCursorDB.spellTextAlpha)
+    local textAlpha = PercentToAlpha(CooldownCursorDB.spellTextAlpha or
+      defaults.spellTextAlpha)
     icon.text:SetTextColor(textr, textg, textb, textAlpha)
   end
 
@@ -482,8 +511,14 @@ function CooldownCursor:UpdateDisplay()
     anchorPoint.y
   )
 
-  -- Set icon size
-  icon:SetSize(CooldownCursorDB.iconSize, CooldownCursorDB.iconSize)
+  -- Set icon size and scale
+  -- Don't scale with icon.icon:SetScale() as it messes with cursor position calculations
+  icon:SetSize(CooldownCursorDB.iconSize * (CooldownCursorDB.scale or defaults.scale),
+    CooldownCursorDB.iconSize * (CooldownCursorDB.scale or defaults.scale))
+
+  -- Set all other scale settings
+  icon.text:SetScale(CooldownCursorDB.scale or defaults.scale)
+  icon.cooldown:SetScale(CooldownCursorDB.scale or defaults.scale)
 
   -- Hide countdown numbers when enabled
   icon.cooldown:SetHideCountdownNumbers(
@@ -496,7 +531,6 @@ function CooldownCursor:UpdateDisplay()
   )
 
   -- Refresh active live spell name
-  -- TODO: Is icon:IsShown() needed?
   if icon:IsShown() and activeSpellID then
     local info = C_Spell.GetSpellInfo(activeSpellID)
     if CooldownCursorDB.showSpellNames and info.name then
@@ -505,17 +539,14 @@ function CooldownCursor:UpdateDisplay()
     else
       icon.text:Hide()
     end
-  else
-    icon.text:Hide()
-  end
-
-  if icon:IsShown() then
-    UpdateCooldownIconFrame(icon)
   end
 
   -- Masque re-skin icon changes
   if MasqueGroup then
     MasqueGroup:ReSkin()
+    if CooldownCursorDB.iconHide then
+      icon.icon:SetAlpha(0)
+    end
   end
 end
 
@@ -544,16 +575,17 @@ local function HideIconNow()
   if CooldownCursorDB.fadeOutDuration == 0 then
     icon:Hide()
     icon.icon:SetAlpha(
-      PercentToAlpha(CooldownCursorDB.iconAlpha)
+      PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
     )
   else
     icon.fadeOut:Stop()
     fadeOut:SetDuration(tonumber(CooldownCursorDB.fadeOutDuration) or 0)
     icon.icon:SetAlpha(
-      PercentToAlpha(CooldownCursorDB.iconAlpha)
+      PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
     )
     icon.fadeOut:Play()
   end
+
 end
 
 ----------------------------------------------------
@@ -580,18 +612,64 @@ end
 ----------------------------------------------------
 -- Settings API
 ----------------------------------------------------
+
+-- Get addon version from metadata
+function CooldownCursor:GetVersion()
+  return C_AddOns.GetAddOnMetadata(addonName, "Version")
+end
+
+-- Get addon version from metadata
+function CooldownCursor:GetAuthor()
+  return C_AddOns.GetAddOnMetadata(addonName, "Author")
+end
+
+-- Get addon notes from metadata
+function CooldownCursor:GetNotes()
+  return C_AddOns.GetAddOnMetadata(addonName, "Notes")
+end
+
+-- Get a value from the SavedVariables table
+function CooldownCursor:GetDBValue(key)
+  return CooldownCursorDB[key] or defaults[key]
+end
+
+-- Set a string value in the SavedVariables table
+function CooldownCursor:SetDBString(key, value)
+  CooldownCursorDB[key] = string.format("%s", value)
+  self:UpdateDisplay()
+end
+
+-- Set a numeric value in the SavedVariables table
+function CooldownCursor:SetDBNumber(key, value)
+  CooldownCursorDB[key] = tonumber(value)
+  self:UpdateDisplay()
+end
+
+-- Set a boolean value in the SavedVariables table
+function CooldownCursor:SetDBBoolean(key, value)
+  CooldownCursorDB[key] = value and true or false
+  self:UpdateDisplay()
+end
+
+-- Set font names and paths in the SavedVariables table
+function CooldownCursor:SetFontPath(key, value)
+  CooldownCursorDB[key] = value
+  CooldownCursorDB[key .. "Path"] = FontPath(
+    CooldownCursorDB[key])
+  self:UpdateDisplay()
+end
+
+-- Get list of all available fonts
 function CooldownCursor:GetAllFonts()
   return FontNames()
 end
 
+-- Get list of valid font types
 function CooldownCursor:GetValidFontTypes()
-  local fontTypes = {}
-  for k, v in pairs(FONT_TYPES) do
-    table.insert(fontTypes, k)
-  end
-  return fontTypes
+  return FONT_TYPES
 end
 
+-- Get list of valid anchor positions
 function CooldownCursor:GetValidAnchorPositions()
   local positions = {}
   for k, v in pairs(ANCHOR_POSITION) do
@@ -600,6 +678,7 @@ function CooldownCursor:GetValidAnchorPositions()
   return positions
 end
 
+-- Get list of valid spell text anchor positions
 function CooldownCursor:GetValidSpellTextAnchorPositions()
   local positions = {}
   for k, v in pairs(SPELL_TEXT_ANCHOR_POINTS) do
@@ -608,6 +687,7 @@ function CooldownCursor:GetValidSpellTextAnchorPositions()
   return positions
 end
 
+-- Get list of valid cooldown text anchor positions
 function CooldownCursor:GetValidCooldownTextAnchorPositions()
   local positions = {}  
   for k, v in pairs(CD_TEXT_ANCHOR_POINTS) do
@@ -616,122 +696,36 @@ function CooldownCursor:GetValidCooldownTextAnchorPositions()
   return positions
 end
 
+-- Validation font type
 function CooldownCursor:GetValidFontType(ftype)
   local fontType = string.upper(ftype)
-  return FONT_TYPES[fontType] ~= nil
+  if fontType == "NONE" then
+    -- nil fonts flags are allowed and valid with obj:SetFont()
+    -- FONT_TYPES["NONE"] is mapped to nil
+    return true
+  end
+  if FONT_TYPES[fontType] then
+    return true
+  end
+  return false
 end
 
+-- Validation anchor position
 function CooldownCursor:GetValidAnchorPosition(pos)
   local anchor = string.upper(pos)
   return ANCHOR_POSITION[anchor] ~= nil
 end
 
+-- Validation anchor position
 function CooldownCursor:GetValidSpellTextAnchorPosition(pos)
   local anchor = string.upper(pos)
   return SPELL_TEXT_ANCHOR_POINTS[anchor] ~= nil
 end
 
+-- Validation cooldown text anchor position
 function CooldownCursor:GetValidCooldownTextAnchorPosition(pos)
   local anchor = string.upper(pos)
   return CD_TEXT_ANCHOR_POINTS[anchor] ~= nil
-end
-
-function CooldownCursor:SetSpellTextFont(fontName)
-  CooldownCursorDB.spellTextFont = fontName
-    or defaults.spellTextFont
-  CooldownCursorDB.spellTextFontPath = FontPath(
-    CooldownCursorDB.spellTextFont or defaults.spellTextFont)
-end
-
-function CooldownCursor:SetSpellTextSize(size)
-  CooldownCursorDB.spellTextSize = tonumber(size)
-    or defaults.spellTextSize
-end
-
-function CooldownCursor:SetSpellTextFontType(ftype)
-  CooldownCursorDB.spellTextFontType = ftype
-    or defaults.spellTextFontType
-end
-
-function CooldownCursor:SetSpellTextColor(colorHex)
-  CooldownCursorDB.spellTextColor = colorHex
-    or defaults.spellTextColor
-end
-
-function CooldownCursor:SetSpellTextAnchor(anchor)
-  CooldownCursorDB.spellTextAnchor = string.upper(
-    anchor or defaults.spellTextAnchor)
-end
-
-function CooldownCursor:SetSpellTextAlpha(alpha)
-  CooldownCursorDB.spellTextAlpha = tonumber(alpha) or defaults.spellTextAlpha
-end
-
-function CooldownCursor:SetCooldownTextFont(fontName)
-  CooldownCursorDB.cooldownTextFont = fontName
-    or defaults.cooldownTextFont
-  CooldownCursorDB.cooldownTextFontPath = FontPath(
-    CooldownCursorDB.cooldownTextFont or defaults.cooldownTextFont)
-end
-
-function CooldownCursor:SetCooldownTextSize(size)
-  CooldownCursorDB.cooldownTextSize = tonumber(size)
-    or defaults.cooldownTextSize
-end
-
-function CooldownCursor:SetCooldownTextFontType(ftype)
-  CooldownCursorDB.cooldownTextFontType = ftype
-    or defaults.cooldownTextFontType
-end
-
-function CooldownCursor:SetCooldownTextColor(colorHex)
-  CooldownCursorDB.cooldownTextColor = colorHex
-    or defaults.cooldownTextColor
-end
-
-function CooldownCursor:SetCooldownTextAnchor(anchor)
-  CooldownCursorDB.cooldownTextAnchor = string.upper(
-  anchor or defaults.cooldownTextAnchor)
-end
-
-function CooldownCursor:SetCooldownTextAlpha(alpha)
-  CooldownCursorDB.cooldownTextAlpha = tonumber(alpha) or defaults.cooldownTextAlpha
-end
-
-function CooldownCursor:SetIconSize(size)
-  CooldownCursorDB.iconSize = tonumber(size) or defaults.iconSize
-end
-
-function CooldownCursor:SetShowSpellNames(enabled)
-  CooldownCursorDB.showSpellNames = enabled
-end
-
-function CooldownCursor:SetHideCooldownNumbers(enabled)
-  CooldownCursorDB.hideCooldownNumbers = enabled
-end
-
-function CooldownCursor:SetIconAlpha(alpha)
-  CooldownCursorDB.iconAlpha = tonumber(alpha) or defaults.iconAlpha
-end
-
-function CooldownCursor:SetIconHide(enabled)
-  CooldownCursorDB.iconHide = enabled
-end
-
-function CooldownCursor:SetShowCooldownSwipe(enabled)
-  CooldownCursorDB.showCooldownSwipe = enabled
-end
-
-function CooldownCursor:SetAnchor(anchor)
-  CooldownCursorDB.anchor = string.upper(anchor or defaults.anchor)
-end
-
-function CooldownCursor:SetMinDuration(seconds)
-  CooldownCursorDB.minDuration = tonumber(seconds) or defaults.minDuration
-end
-
-function CooldownCursor:SetMaxDuration(seconds)
-  CooldownCursorDB.maxDuration = tonumber(seconds) or defaults.maxDuration
 end
 
 function CooldownCursor:SetHideAfter(seconds)
@@ -742,20 +736,12 @@ function CooldownCursor:SetHideAfter(seconds)
   end
 end
 
-function CooldownCursor:SetAnimation(enabled)
-  CooldownCursorDB.animation = enabled
-end
-
 function CooldownCursor:SetFadeOutDuration(seconds)
   CooldownCursorDB.fadeOutDuration = tonumber(seconds) or defaults.fadeOutDuration
   -- If icon currently visible, re-arm timer using new value 
-  -- if icon:IsShown() and not previewActive then
-  --   HideIconNow()
-  -- end
-end
-
-function CooldownCursor:SetShowWhen(state)
-  CooldownCursorDB.showWhen = state
+  if icon:IsShown() and not previewActive then
+    HideIconNow()
+  end
 end
 
 function CooldownCursor:ResetSettings()
@@ -872,6 +858,10 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
 
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT and not inCombat then
+      return
+    end
+
+    if CooldownCursorDB.hideWhileMounted and IsMounted() then
       return
     end
 

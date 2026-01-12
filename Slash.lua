@@ -276,9 +276,9 @@ end
 
 handlers.scale = function(arg1)
   local n = ToNum(arg1)
-  if not n then return Usage("/cdcursor scale <1-5>") end
-  if n < 1 or n > 5 then
-    Print("scale must be greater than or equal to 1 and less than or equal to 5")
+  if not n then return Usage("/cdcursor scale <0.5 - 5>") end
+  if n < 0.5 or n > 5 then
+    Print("scale must be greater than or equal to 0.5 and less than or equal to 5")
     return
   end
   CooldownCursor:SetDBNumber("scale", n)

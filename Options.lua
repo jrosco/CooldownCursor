@@ -111,33 +111,52 @@ local options = {
 
     spacer1 = { type = "description", name = " ", order = 5 },
 
-    animation = {
-      type = "toggle",
-      name = "Animation",
-      desc = "Enable the icon pop animation.",
-      order = 6,
-      get = function() return not not CooldownCursor:GetDBValue("animation") end,
-      set = function(_, v) CooldownCursor:SetDBBoolean("animation", v) end,
+    hideAfter = {
+      type = "range",
+      name = "Hide After (seconds)",
+      desc = "How long the icon stays visible before hiding.",
+      order = 5,
+      min = 0.5, max = 30, step = 0.1,
+      get = function() return CooldownCursor:GetDBValue("hideAfter") end,
+      set = function(_, v) CooldownCursor:SetHideAfter(v) end,
     },
 
     fadeOutDuration = {
       type = "range",
       name = "Fade Out (seconds)",
       desc = "How long the icon takes to fade out when hiding.",
-      order = 7,
+      order = 6,
       min = 0, max = 3, step = 0.05,
       get = function() return CooldownCursor:GetDBValue("fadeOutDuration") end,
       set = function(_, v) CooldownCursor:SetFadeOutDuration(v) end,
     },
 
-    hideAfter = {
+    scale = {
       type = "range",
-      name = "Hide After (seconds)",
-      desc = "How long the icon stays visible before hiding.",
+      name = "Scale",
+      desc = "Scale of the icon and text (0.5 - 5).",
+      order = 7,
+      min = 0.5, max = 5, step = 0.01,
+      get = function() return CooldownCursor:GetDBValue("scale") end,
+      set = function(_, v) CooldownCursor:SetDBNumber("scale", v) end,
+    },
+
+    animation = {
+      type = "toggle",
+      name = "Animation",
+      desc = "Enable the icon pop animation.",
       order = 8,
-      min = 0.5, max = 30, step = 0.1,
-      get = function() return CooldownCursor:GetDBValue("hideAfter") end,
-      set = function(_, v) CooldownCursor:SetHideAfter(v) end,
+      get = function() return not not CooldownCursor:GetDBValue("animation") end,
+      set = function(_, v) CooldownCursor:SetDBBoolean("animation", v) end,
+    },
+
+    hideWhileMounted = {
+      type = "toggle",
+      name = "Hide While Mounted",
+      desc = "Hide the icon while mounted.",
+      order = 9,
+      get = function() return not not CooldownCursor:GetDBValue("hideWhileMounted") end,
+      set = function(_, v) CooldownCursor:SetDBBoolean("hideWhileMounted", v) end,
     },
 
     iconGroup = {

@@ -739,7 +739,6 @@ function CooldownCursor:GetValidCooldownTextAnchorPosition(pos)
   return CD_TEXT_ANCHOR_POINTS[anchor] ~= nil
 end
 
-
 function CooldownCursor:SetHideAfter(seconds)
   CooldownCursorDB.hideAfter = tonumber(seconds) or defaults.hideAfter
   -- If icon currently visible, re-arm timer using new value

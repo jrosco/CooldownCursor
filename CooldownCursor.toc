@@ -1,8 +1,8 @@
-## Interface: 110207, 120000, 120001
+## Interface: 120000, 120001
 ## Title: CooldownCursor
 ## Notes: Shows cooldown timers at your cursor position
 ## Author: jrosco
-## Version: 0.1.1
+## Version: 1.0.0
 ## SavedVariables: CooldownCursorDB
 ## OptionalDeps: Masque
 

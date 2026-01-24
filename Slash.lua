@@ -51,6 +51,7 @@ local function Help()
  /cdcursor scale                    - Set scale of icon and texts
  /cdcursor animation                - Toggle icon animation on/off
  /cdcursor fadeout                  - Set icon fade-out duration in seconds
+ /cdcursor strata                   - Set icon frame strata
  /cdcursor hideafter                - Set icon hide-after duration in seconds
  /cdcursor show <0||1||2>           - 0=always, 1=in-combat, 2=out-of-combat
  /cdcursor mount                    - Toggle hide while mounted
@@ -285,6 +286,18 @@ handlers.show = function(arg1)
   Print("show mode set to:", label)
 end
 
+handlers.strata = function(arg1)
+  local strata = string.upper(arg1)
+  if not CooldownCursor:GetValidFrameStrata(strata) then
+    Print("invalid frame strata:", strata)
+    Print("/cdcursor strata <strata>")
+    Print("valid stratas are: background, low, medium, high, dialog, tooltip")
+    return
+  end
+  CooldownCursor:SetDBString("frameStrata", strata)
+  Print("icon frame strata set to:", strata)
+end
+
 handlers.text = function(arg1, arg2)
   if not arg1 or arg1 == "" then
     Usage("/cdcursor text <alpha||anchor||color||font||ftype||size||toggle>")
@@ -371,6 +384,7 @@ handlers.status = function()
   local show = CooldownCursor:GetDBValue("showWhen")
   local showLabel = (show == 0 and "always") or (show == 1 and "in-combat") or "out-of-combat"
   Print("   show mode:", show, "(", showLabel, ")")
+  Print("   frame strata:", CooldownCursor:GetDBValue("frameStrata"))
   Print("   hide while mounted:", CooldownCursor:GetDBValue("hideWhileMounted") and "enabled" or "disabled")
   Print("   size:", CooldownCursor:GetDBValue("iconSize"))
   Print("   scale:", CooldownCursor:GetDBValue("scale"))

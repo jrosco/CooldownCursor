@@ -13,6 +13,7 @@ end
 
 local fontValues = {}
 local anchorValues = {}
+local frameStrataValues = {}
 
 local fontTypeValues = {
   NONE = "None",
@@ -32,6 +33,17 @@ local function AnchorValues()
     anchorValues[a] = a
   end
   return anchorValues
+end
+
+local function FrameStrataValues()
+  if next(frameStrataValues) ~= nil then
+    -- return cached values
+    return frameStrataValues
+  end
+  for _, a in ipairs(CooldownCursor:GetValidFrameStratas()) do
+    frameStrataValues[a] = a
+  end
+  return frameStrataValues
 end
 
 local function FontValues()
@@ -202,11 +214,21 @@ local options = {
           set = function(_, v) CooldownCursor:SetDBNumber("iconAlpha", v) end,
         },
 
+        strata = {
+          type = "select",
+          name = "Frame Strata",
+          desc = "Orders the icon on the screen, affecting how it overlaps on the UI.",
+          order = 5,
+          values = FrameStrataValues,
+          get = function() return CooldownCursor:GetDBValue("frameStrata") end,
+          set = function(_, v) CooldownCursor:SetDBString("frameStrata", v) end,
+        },
+
         anchor = {
           type = "select",
           name = "Anchor",
           desc = "Where to place the icon relative to the cursor.",
-          order = 5,
+          order = 6,
           values = AnchorValues,
           get = function() return CooldownCursor:GetDBValue("anchor") end,
           set = function(_, v) CooldownCursor:SetDBString("anchor", v) end,
@@ -298,7 +320,7 @@ local options = {
             if CooldownCursor:IsOmniCCLoaded() then
               return "|cffff5555OmniCC detected: these settings will be ignored to avoid conflicts.|r"
             end
-            return "test"
+            return nil
           end,
           order = 0,
         },

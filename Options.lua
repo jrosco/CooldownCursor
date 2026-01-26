@@ -99,7 +99,7 @@ local options = {
       type = "select",
       name = "Show",
       desc = "When the icon should appear.",
-      order = 1,
+      order = 10,
       values = ShowWhenValues(),
       get = function() return CooldownCursor:GetDBValue("showWhen") end,
       set = function(_, v) CooldownCursor:SetDBNumber("showWhen", v) end,
@@ -109,7 +109,7 @@ local options = {
       type = "execute",
       name = "Preview",
       desc = "Toggle the preview cooldown",
-      order = 2,
+      order = 20,
       func = function() CooldownCursor:Preview() end,
     },
 
@@ -117,18 +117,9 @@ local options = {
       type = "toggle",
       name = "Preview on Cursor",
       desc = "Enable the preview cooldown at the cursor.",
-      order = 3,
+      order = 30,
       get = function() return not not CooldownCursor:GetPreviewMouseMode() end,
       set = function(_, v) CooldownCursor:SetPreviewMouseMode(v) end,
-    },
-
-    reset = {
-      type = "execute",
-      name = "Reset",
-      desc = "Reset all settings to defaults.",
-      order = 4,
-      confirm = true,
-      func = function() CooldownCursor:ResetSettings() end,
     },
 
     spacer1 = { type = "description", name = " ", order = 5 },
@@ -137,7 +128,7 @@ local options = {
       type = "range",
       name = "Hide After (seconds)",
       desc = "How long the icon stays visible before hiding.",
-      order = 5,
+      order = 40,
       min = 0.5, max = 30, step = 0.1,
       get = function() return CooldownCursor:GetDBValue("hideAfter") end,
       set = function(_, v) CooldownCursor:SetHideAfter(v) end,
@@ -147,7 +138,7 @@ local options = {
       type = "range",
       name = "Fade Out (seconds)",
       desc = "How long the icon takes to fade out when hiding.",
-      order = 6,
+      order = 50,
       min = 0, max = 3, step = 0.05,
       get = function() return CooldownCursor:GetDBValue("fadeOutDuration") end,
       set = function(_, v) CooldownCursor:SetFadeOutDuration(v) end,
@@ -157,7 +148,7 @@ local options = {
       type = "range",
       name = "Scale",
       desc = "Scale of the icon and text (0.5 - 5).",
-      order = 7,
+      order = 60,
       min = 0.5, max = 5, step = 0.01,
       get = function() return CooldownCursor:GetDBValue("scale") end,
       set = function(_, v) CooldownCursor:SetDBNumber("scale", v) end,
@@ -167,7 +158,7 @@ local options = {
       type = "toggle",
       name = "Animation",
       desc = "Enable the icon pop animation.",
-      order = 8,
+      order = 70,
       get = function() return not not CooldownCursor:GetDBValue("animation") end,
       set = function(_, v) CooldownCursor:SetDBBoolean("animation", v) end,
     },
@@ -176,15 +167,24 @@ local options = {
       type = "toggle",
       name = "Hide While Mounted",
       desc = "Hide the icon while mounted.",
-      order = 9,
+      order = 80,
       get = function() return not not CooldownCursor:GetDBValue("hideWhileMounted") end,
       set = function(_, v) CooldownCursor:SetDBBoolean("hideWhileMounted", v) end,
+    },
+
+    reset = {
+      type = "execute",
+      name = "Reset",
+      desc = "Reset all settings to defaults.",
+      order = 90,
+      confirm = true,
+      func = function() CooldownCursor:ResetSettings() end,
     },
 
     iconGroup = {
       type = "group",
       name = "Icon",
-      order = 20,
+      order = 100,
       args = {
         iconHide = {
           type = "toggle",
@@ -199,7 +199,7 @@ local options = {
           type = "toggle",
           name = "Swipe",
           desc = "Show the cooldown swipe overlay.",
-          order = 2,
+          order = 110,
           get = function() return not not CooldownCursor:GetDBValue("showCooldownSwipe") end,
           set = function(_, v) CooldownCursor:SetDBBoolean("showCooldownSwipe", v) end,
         },
@@ -208,7 +208,7 @@ local options = {
           type = "range",
           name = "Size",
           desc = "Icon size in pixels.",
-          order = 3,
+          order = 120,
           min = 16, max = 128, step = 1,
           get = function() return CooldownCursor:GetDBValue("iconSize") end,
           set = function(_, v) CooldownCursor:SetDBNumber("iconSize", v) end,
@@ -218,7 +218,7 @@ local options = {
           type = "range",
           name = "Alpha (%)",
           desc = "Icon transparency (0-100).",
-          order = 4,
+          order = 130,
           min = 0, max = 100, step = 1,
           get = function() return CooldownCursor:GetDBValue("iconAlpha") end,
           set = function(_, v) CooldownCursor:SetDBNumber("iconAlpha", v) end,
@@ -228,7 +228,7 @@ local options = {
           type = "select",
           name = "Frame Strata",
           desc = "Orders the icon on the screen, affecting how it overlaps on the UI.",
-          order = 5,
+          order = 140,
           values = FrameStrataValues,
           get = function() return CooldownCursor:GetDBValue("frameStrata") end,
           set = function(_, v) CooldownCursor:SetDBString("frameStrata", v) end,
@@ -238,7 +238,7 @@ local options = {
           type = "select",
           name = "Anchor",
           desc = "Where to place the icon relative to the cursor.",
-          order = 6,
+          order = 150,
           values = AnchorValues,
           get = function() return CooldownCursor:GetDBValue("anchor") end,
           set = function(_, v) CooldownCursor:SetDBString("anchor", v) end,
@@ -249,7 +249,7 @@ local options = {
     textGroup = {
       type = "group",
       name = "Spell Text",
-      order = 30,
+      order = 200,
       args = {
         showSpellNames = {
           type = "toggle",
@@ -262,7 +262,7 @@ local options = {
         spellTextAlpha = {
           type = "range",
           name = "Alpha (%)",
-          order = 2,
+          order = 210,
           min = 0, max = 100, step = 1,
           get = function() return CooldownCursor:GetDBValue("spellTextAlpha") end,
           set = function(_, v) CooldownCursor:SetDBNumber("spellTextAlpha", v) end,
@@ -272,7 +272,7 @@ local options = {
           type = "select",
           name = "Anchor",
           desc = "Where the spell name appears relative to the icon.",
-          order = 3,
+          order = 220,
           values = { TOP = "TOP", BOTTOM = "BOTTOM" },
           get = function() return (CooldownCursor:GetDBValue("spellTextAnchor") or "TOP") end,
           set = function(_, v) CooldownCursor:SetDBString("spellTextAnchor", v) end,
@@ -281,7 +281,7 @@ local options = {
         spellTextSize = {
           type = "range",
           name = "Size",
-          order = 4,
+          order = 230,
           min = 6, max = 80, step = 1,
           get = function() return tonumber(CooldownCursor:GetDBValue("spellTextSize")) or 14 end,
           set = function(_, v) CooldownCursor:SetDBNumber("spellTextSize", v) end,
@@ -290,7 +290,7 @@ local options = {
         spellTextFont = {
           type = "select",
           name = "Font",
-          order = 5,
+          order = 240,
           values = FontValues,
           get = function() return (CooldownCursor:GetDBValue("spellTextFont")) end,
           set = function(_, v) CooldownCursor:SetFontPath("spellTextFont", v) end,
@@ -299,7 +299,7 @@ local options = {
         spellTextFontType = {
           type = "select",
           name = "Font Type",
-          order = 6,
+          order = 250,
           values = fontTypeValues,
           get = function() return (CooldownCursor:GetDBValue("spellTextFontType")) end,
           set = function(_, v)
@@ -312,7 +312,7 @@ local options = {
           type = "color",
           name = "Color",
           hasAlpha = false,
-          order = 7,
+          order = 260,
           get = function() return HexColorGet("spellTextColor", "ffd100") end,
           set = function(_, r, g, b, a) HexColorSet("spellTextColor", r, g, b, a) end,
         },
@@ -322,7 +322,7 @@ local options = {
     numberGroup = {
       type = "group",
       name = "Cooldown Numbers",
-      order = 40,
+      order = 300,
       args = {
         omniCCWarn = {
           type = "description",
@@ -339,7 +339,7 @@ local options = {
           type = "toggle",
           name = "Hide Blizzard Cooldown Numbers",
           desc = "If enabled, the Blizzard cooldown number text is hidden.",
-          order = 1,
+          order = 310,
           disabled = function() return CooldownCursor:IsOmniCCLoaded() end,
           get = function() return not not CooldownCursor:GetDBValue("hideCooldownNumbers") end,
           set = function(_, v) CooldownCursor:SetDBBoolean("hideCooldownNumbers", v) end,
@@ -348,7 +348,7 @@ local options = {
         cooldownTextAlpha = {
           type = "range",
           name = "Alpha (%)",
-          order = 2,
+          order = 320,
           min = 0, max = 100, step = 1,
           disabled = function() return CooldownCursor:IsOmniCCLoaded() end,
           get = function() return (CooldownCursor:GetDBValue("cooldownTextAlpha")) end,
@@ -358,7 +358,7 @@ local options = {
         cooldownTextAnchor = {
           type = "select",
           name = "Anchor",
-          order = 3,
+          order = 330,
           disabled = function() return CooldownCursor:IsOmniCCLoaded() end,
           values = {
             TOP="TOP", BOTTOM="BOTTOM", LEFT="LEFT", RIGHT="RIGHT",
@@ -372,7 +372,7 @@ local options = {
         cooldownTextSize = {
           type = "range",
           name = "Size",
-          order = 4,
+          order = 340,
           min = 6, max = 80, step = 1,
           disabled = function() return CooldownCursor:IsOmniCCLoaded() end,
           get = function() return tonumber(CooldownCursor:GetDBValue("cooldownTextSize")) or 16 end,
@@ -382,7 +382,7 @@ local options = {
         cooldownTextFont = {
           type = "select",
           name = "Font",
-          order = 5,
+          order = 350,
           disabled = function() return CooldownCursor:IsOmniCCLoaded() end,
           values = FontValues,
           get = function() return (CooldownCursor:GetDBValue("cooldownTextFont")) end,
@@ -392,7 +392,7 @@ local options = {
         cooldownTextFontType = {
           type = "select",
           name = "Font Type",
-          order = 6,
+          order = 360,
           disabled = function() return CooldownCursor:IsOmniCCLoaded() end,
           values = fontTypeValues,
           get = function() return (CooldownCursor:GetDBValue("cooldownTextFontType") or "OUTLINE") end,
@@ -406,7 +406,7 @@ local options = {
           type = "color",
           name = "Color",
           hasAlpha = false,
-          order = 7,
+          order = 370,
           disabled = function() return CooldownCursor:IsOmniCCLoaded() end,
           get = function() return HexColorGet("cooldownTextColor", "ffffff") end,
           set = function(_, r, g, b, a) HexColorSet("cooldownTextColor", r, g, b, a) end,
@@ -416,12 +416,12 @@ local options = {
     maintainerGroup = {
       type = "group",
       name = "Maintainer",
-      order = 50,
+      order = 400,
       args = {
         aboutHeader = {
           type = "header",
           name = "Addon Information",
-          order = 0,
+          order = 410,
         },
 
         version = {
@@ -429,7 +429,7 @@ local options = {
           name = function()
             return "Version: |cffffffff" .. CooldownCursor:GetVersion() .. "|r"
           end,
-          order = 1,
+          order = 420,
         },
 
         author = {
@@ -437,7 +437,7 @@ local options = {
           name = function()
             return "Author: |cffffffff" .. CooldownCursor:GetAuthor() .. "|r"
           end,
-          order = 2,
+          order = 430,
         },
 
         notes = {
@@ -447,7 +447,7 @@ local options = {
             if notes == "" then return "" end
             return "Notes: |cffffffff" .. notes .. "|r"
           end,
-          order = 3,
+          order = 440,
         },
 
         spacer = { type = "description", name = " ", order = 4 },
@@ -455,7 +455,7 @@ local options = {
         website = {
           type = "input",
           name = "Website",
-          order = 5,
+          order = 450,
           width = "full",
           get = function() return "https://www.curseforge.com/wow/addons/cooldowncursor" end,
           set = function() end, -- read-only
@@ -465,7 +465,7 @@ local options = {
           type = "input",
           name = "Issues / GitHub",
           desc = "Where to report bugs / feature requests.",
-          order = 6,
+          order = 460,
           width = "full",
           get = function() return "https://github.com/jrosco/CooldownCursor/issues" end,
           set = function() end, -- read-only
@@ -474,7 +474,7 @@ local options = {
         slash = {
           type = "description",
           name = "Slash commands: |cffffffff/cdc|r or |cffffffff/cdcursor|r",
-          order = 7,
+          order = 470,
         },
       },
     },

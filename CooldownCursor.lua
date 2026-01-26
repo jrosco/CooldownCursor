@@ -32,6 +32,15 @@ local ANCHOR_POSITION = {
   BOTTOMRIGHT = "BOTTOMRIGHT",
 }
 
+local FRAME_STRATA = {
+  BACKGROUND = "BACKGROUND",
+  LOW = "LOW",
+  MEDIUM = "MEDIUM",
+  HIGH = "HIGH",
+  DIALOG = "DIALOG",
+  TOOLTIP = "TOOLTIP",
+}
+
 local CD_TEXT_ANCHOR_POINTS = {
   TOP = {
     point = "TOP",
@@ -158,6 +167,7 @@ local defaults = {
   cooldownTextColor = "#FFFFFF",
   cooldownTextAnchor = CD_TEXT_ANCHOR_POINTS.CENTER.point,
   cooldownTextAlpha = 100,
+  frameStrata = FRAME_STRATA.HIGH,
 }
 
 function CooldownCursor:ApplyDefaults()
@@ -175,6 +185,7 @@ end
 local icon = CreateFrame("Frame", "CooldownCursorIcon", UIParent)
 icon:EnableMouse(false)
 icon:SetSize(defaults.iconSize, defaults.iconSize)
+icon:SetFrameStrata(defaults.frameStrata)
 icon:Hide()
 
 icon.icon = icon:CreateTexture(nil, "BACKGROUND")
@@ -451,6 +462,12 @@ function CooldownCursor:UpdateDisplay()
     PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
   )
 
+  -- Set frame strata
+  icon:SetFrameStrata(
+    FRAME_STRATA[string.upper(CooldownCursorDB.frameStrata)] or
+    FRAME_STRATA[string.upper(defaults.frameStrata)]
+  )
+
   -- Check for OmniCC presence
   local omniCC = self:IsOmniCCLoaded()
   if icon.cooldownText and not omniCC then
@@ -678,6 +695,15 @@ function CooldownCursor:GetValidAnchorPositions()
   return positions
 end
 
+-- Get list of valid frame strata
+function CooldownCursor:GetValidFrameStratas()
+  local stratas = {}
+  for k, v in pairs(FRAME_STRATA) do
+    table.insert(stratas, k)
+  end
+  return stratas
+end
+
 -- Get list of valid spell text anchor positions
 function CooldownCursor:GetValidSpellTextAnchorPositions()
   local positions = {}
@@ -726,6 +752,12 @@ end
 function CooldownCursor:GetValidCooldownTextAnchorPosition(pos)
   local anchor = string.upper(pos)
   return CD_TEXT_ANCHOR_POINTS[anchor] ~= nil
+end
+
+-- Validation frame strata
+function CooldownCursor:GetValidFrameStrata(strata)
+  local fs = string.upper(strata)
+  return FRAME_STRATA[fs] ~= nil
 end
 
 function CooldownCursor:SetHideAfter(seconds)

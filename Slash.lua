@@ -56,7 +56,6 @@ local function Help()
  /cdcursor show <0||1||2>           - 0=always, 1=in-combat, 2=out-of-combat
  /cdcursor mount                    - Toggle hide while mounted
  /cdcursor preview                  - Toggle preview mode
- /cdcursor config                   - Open configuration panel
  /cdcursor help                     - Show this help message
  /cdcursor reset                    - Reset all settings to default
  /cdcursor status                   - Show current settings
@@ -87,14 +86,6 @@ handlers.animation = function()
   local toggle = ToggleBool(CooldownCursor:GetDBValue("animation"))
   CooldownCursor:SetDBBoolean("animation", toggle)
   Print("animation set to:", toggle and "on" or "off")
-end
-
-handlers.config = function()
-  if not CooldownCursor:isAceConfigLoaded() then
-    Print("AceConfig not found! Cannot open options panel.")
-    return
-  end
-  Settings.OpenToCategory("CooldownCursor")
 end
 
 handlers.fadeout = function(arg1)

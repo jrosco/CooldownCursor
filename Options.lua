@@ -1,6 +1,7 @@
 -- Options.lua
 local addonName, addonTable = ...
 local CooldownCursor = addonTable.Frame
+local OPTIONS_APP_NAME = addonName
 
 local AceConfig = LibStub and LibStub("AceConfig-3.0", true)
 local AceConfigDialog = LibStub and LibStub("AceConfigDialog-3.0", true)
@@ -107,9 +108,18 @@ local options = {
     preview = {
       type = "execute",
       name = "Preview",
-      desc = "Toggle the preview cooldown at the cursor.",
+      desc = "Toggle the preview cooldown",
       order = 2,
       func = function() CooldownCursor:Preview() end,
+    },
+
+    previewMouse = {
+      type = "toggle",
+      name = "Preview on Cursor",
+      desc = "Enable the preview cooldown at the cursor.",
+      order = 3,
+      get = function() return not not CooldownCursor:GetPreviewMouseMode() end,
+      set = function(_, v) CooldownCursor:SetPreviewMouseMode(v) end,
     },
 
     reset = {
@@ -471,15 +481,41 @@ local options = {
   },
 }
 
+function CooldownCursor:OnOptionsOpened()
+  -- Options Panel Opened
+  return
+end
+
+function CooldownCursor:OnOptionsClosed()
+  -- Options Panel Closed
+  CooldownCursor:HideIconNow()
+  CooldownCursor:SetPreviewMouseMode(false)
+end
+
 function CooldownCursor:isAceConfigLoaded()
-  return AceConfig ~= nil and AceConfigDialog ~= nil
+  return AceConfig and AceConfigDialog
 end
 
 function CooldownCursor:InitAce3Options()
   if not self:isAceConfigLoaded() then return end
-  -- Register options table
-  AceConfig:RegisterOptionsTable(addonName, options)
 
-  -- Add to Blizzard Interface Options (Ace3 creates the panel)
-  AceConfigDialog:AddToBlizOptions(addonName, "CooldownCursor")
+  -- Register option schema
+  AceConfig:RegisterOptionsTable(OPTIONS_APP_NAME, options)
+
+  -- Register Blizzard Settings panel
+  AceConfigDialog:AddToBlizOptions(
+    OPTIONS_APP_NAME,
+    "CooldownCursor"
+  )
+
+  -- Detect Blizzard Settings panel open
+  hooksecurefunc(SettingsPanel, "Open", function()
+    self:OnOptionsOpened()
+  end)
+
+  -- Detect Blizzard Settings panel closed
+  hooksecurefunc(SettingsPanel, "Close", function()
+    self:OnOptionsClosed()
+  end)
+
 end

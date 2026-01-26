@@ -267,6 +267,8 @@ end
 
 handlers.preview = function()
   CooldownCursor:Preview()
+  local mode = ToggleBool(CooldownCursor:GetPreviewMouseMode())
+  CooldownCursor:SetPreviewMouseMode(mode)
   Print("toggled preview.")
 end
 

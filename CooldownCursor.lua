@@ -13,6 +13,7 @@ local hideTimer = nil
 local activeSpellID = nil
 local inCombat = false
 local fontsTable = {}
+local previewMouseMode = false
 
 local SHOW_WHEN_STATE = {
   ALWAYS = 0,
@@ -570,7 +571,7 @@ end
 ----------------------------------------------------
 -- Internal hide helper
 ----------------------------------------------------
-local function HideIconNow()
+function CooldownCursor:HideIconNow()
   if previewTicker then
     previewTicker:Cancel()
     previewTicker = nil
@@ -621,7 +622,7 @@ local function ScheduleHideTimer()
 
   hideTimer = C_Timer.NewTimer(hideDelay, function()
     if lastSpellId == activeSpellID then
-      HideIconNow()
+      CooldownCursor:HideIconNow()
     end
   end)
 end
@@ -772,15 +773,27 @@ function CooldownCursor:SetFadeOutDuration(seconds)
   CooldownCursorDB.fadeOutDuration = tonumber(seconds) or defaults.fadeOutDuration
   -- If icon currently visible, re-arm timer using new value 
   if icon:IsShown() and not previewActive then
-    HideIconNow()
+    CooldownCursor:HideIconNow()
+  end
+end
+
+function CooldownCursor:GetPreviewMouseMode()
+  return previewMouseMode
+end
+
+function CooldownCursor:SetPreviewMouseMode(enabled)
+  previewMouseMode = enabled
+  if previewActive then
+    CooldownCursor:ApplyPreviewPosition()
   end
 end
 
 function CooldownCursor:ResetSettings()
-  HideIconNow()
+  CooldownCursor:HideIconNow()
   CooldownCursorDB = {}
   self:ApplyDefaults()
   self:UpdateDisplay()
+  CooldownCursor:SetPreviewMouseMode(false)
 end
 
 ----------------------------------------------------
@@ -839,26 +852,32 @@ function CooldownCursor:Preview()
       previewTicker:Cancel()
       previewTicker = nil
     end
-    HideIconNow()
+    CooldownCursor:HideIconNow()
     return
   end
 
   previewActive = true
-
-  -- Show once using your normal function/path
   ShowSpellIcon(previewSpellID, GetTime(), previewDuration)
-
-  -- Loop: when it finishes, start again
-  -- It loops because C_Timer.NewTicker() is the loop.
-  if previewTicker then
-    previewTicker:Cancel()
-    previewTicker = nil
-  end
+  CooldownCursor:ApplyPreviewPosition()
 
   previewTicker = C_Timer.NewTicker(previewDuration, function()
-    if not previewActive or not icon:IsShown() then return end
-    icon.cooldown:SetCooldown(GetTime(), previewDuration)
+    if previewActive and icon:IsShown() then
+      icon.cooldown:SetCooldown(GetTime(), previewDuration)
+    end
   end)
+end
+
+function CooldownCursor:ApplyPreviewPosition()
+  if not previewActive or not icon:IsShown() then return end
+
+  if previewMouseMode then
+    icon:SetScript("OnUpdate", UpdateCooldownIconFrame)
+  else
+    icon:SetScript("OnUpdate", nil)
+    icon:SetFrameStrata("HIGH")
+    icon:ClearAllPoints()
+    icon:SetPoint("LEFT", SettingsPanel, "RIGHT", 8, 0)
+  end
 end
 
 ----------------------------------------------------
@@ -870,6 +889,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     if name ~= addonName then return end
     self:ApplyDefaults()
     self:UpdateDisplay()
+    self:InitAce3Options()
     self:UnregisterEvent("ADDON_LOADED")
     return
   end
@@ -908,7 +928,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
 
     -- Different spell overrides current display immediately
     if lastSpellId and lastSpellId ~= spellID then
-      HideIconNow()
+      CooldownCursor:HideIconNow()
     end
 
     lastSpellId = spellID

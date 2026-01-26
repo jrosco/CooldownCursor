@@ -56,6 +56,7 @@ local function Help()
  /cdcursor show <0||1||2>           - 0=always, 1=in-combat, 2=out-of-combat
  /cdcursor mount                    - Toggle hide while mounted
  /cdcursor preview                  - Toggle preview mode
+ /cdcursor help                     - Show this help message
  /cdcursor reset                    - Reset all settings to default
  /cdcursor status                   - Show current settings
 ]])
@@ -257,6 +258,8 @@ end
 
 handlers.preview = function()
   CooldownCursor:Preview()
+  local mode = ToggleBool(CooldownCursor:GetPreviewMouseMode())
+  CooldownCursor:SetPreviewMouseMode(mode)
   Print("toggled preview.")
 end
 
@@ -267,9 +270,9 @@ end
 
 handlers.scale = function(arg1)
   local n = ToNum(arg1)
-  if not n then return Usage("/cdcursor scale <1-5>") end
-  if n < 1 or n > 5 then
-    Print("scale must be greater than or equal to 1 and less than or equal to 5")
+  if not n then return Usage("/cdcursor scale <0.5 - 5>") end
+  if n < 0.5 or n > 5 then
+    Print("scale must be greater than or equal to 0.5 and less than or equal to 5")
     return
   end
   CooldownCursor:SetDBNumber("scale", n)

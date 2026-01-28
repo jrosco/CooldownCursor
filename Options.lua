@@ -1,4 +1,3 @@
--- Options.lua
 local addonName, addonTable = ...
 local CooldownCursor = addonTable.Frame
 local OPTIONS_APP_NAME = addonName
@@ -24,6 +23,168 @@ local fontTypeValues = {
   MONOCHROMEOUTLINE = "Monochrome Outline",
   MONOCHROMETHICKOUTLINE = "Monochrome Thick Outline",
 }
+
+local function GetRuleDisplayColor(enabled)
+  local whitelistSuffix = ""
+  local blacklistSuffix = ""
+  if CooldownCursorDB.spellRules.settings.disableRules then
+    return "9d9d9d", "(disabled)"
+  end
+
+  if CooldownCursorDB.spellRules.settings.whitelist then
+    whitelistSuffix = "(*)"
+  end
+  if not CooldownCursorDB.spellRules.settings.whitelist then
+    blacklistSuffix = "(*)"
+  end
+  if enabled == nil then return "ffff00", "" end
+  if enabled then return "00ff00", whitelistSuffix end
+
+  return "ff5555", blacklistSuffix
+end
+
+function CooldownCursor:RebuildSpellRuleOptions()
+  local group = self.options.args.spellRulesGroup
+  local args = group.args
+
+  -- Remove old spell entries only
+  for k in pairs(args) do
+    if k:match("^spell_") then
+      args[k] = nil
+    end
+  end
+
+  CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or { rules = {} }
+
+  -- Build sortable list
+  local sorted = {}
+
+  for spellID, rule in pairs(CooldownCursorDB.spellRules.rules) do
+    if type(spellID) == "number" then
+      local info = C_Spell.GetSpellInfo(spellID)
+      local name = info and info.name or ("SpellID " .. spellID)
+      local icon = info and info.originalIconID or nil
+
+      table.insert(sorted, {
+        spellID = spellID,
+        icon = icon,
+        name = name,
+        rule = rule,
+      })
+    end
+  end
+
+  -- Sort alphabetically (case-insensitive)
+  table.sort(sorted, function(a, b)
+    return a.name:lower() < b.name:lower()
+  end)
+
+  -- Build UI groups
+  local order = 10
+
+  for _, entry in ipairs(sorted) do
+    local spellID = entry.spellID
+    local rule = entry.rule
+    local name = entry.name
+    local enabled = rule.enabled
+    local icon = entry.icon
+    local color, suffix = GetRuleDisplayColor(enabled)
+    name = ("|cff%s%s %s|r"):format(color, name, suffix)
+
+    args["spell_" .. spellID] = {
+      type = "group",
+      name = name,
+      order = order,
+      icon = icon,
+      inline = false,
+      disabled = function() return CooldownCursorDB.spellRules.settings.disableRules end,
+      args = {
+
+        enabled = {
+          type = "select",
+          name = "Rule Type",
+          desc = "Whitelist (show spell) or Blacklist (hide spell).",
+          values = { [true] = "Whitelist", [false] = "Blacklist" },
+          order = 10,
+          get = function() return rule.enabled ~= false end,
+          set = function(_, v)
+            rule.enabled = v
+            self:UpdateDisplay()
+            self:RebuildSpellRuleOptions()
+            self:NotifyOptionsChanged()
+          end,
+        },
+
+        header = {
+          type = "header",
+          name = "Spell icon options",
+          order = 20,
+        },
+
+        description = {
+          type = "description",
+          name = "Update a spell icon settings.",
+          order = 21,
+        },
+
+        iconSize = {
+          type = "range",
+          name = "Icon Size",
+          order = 22,
+          min = 16, max = 128, step = 1,
+          disabled = function()
+            return rule.useGlobalIconSize ~= false or rule.enabled == false
+          end,
+          get = function()
+            return rule.iconSize or CooldownCursor:GetDBValue("iconSize")
+          end,
+          set = function(_, v)
+            rule.iconSize = v
+            rule.useGlobalIconSize = false -- auto-disable inheritance
+            self:UpdateDisplay()
+          end,
+        },
+
+        useGlobalIconSize = {
+          type = "toggle",
+          name = "Use Global Icon Size",
+          desc = "Use the global icon size instead of a per-spell value.",
+          order = 23,
+          get = function()
+            return rule.useGlobalIconSize ~= false
+          end,
+          set = function(_, v)
+            rule.useGlobalIconSize = v
+            if v then
+              rule.iconSize = nil
+            end
+            self:UpdateDisplay()
+          end,
+        },
+
+        footer = {
+          type = "header",
+          name = "",
+          order = 100,
+        },
+
+        remove = {
+          type = "execute",
+          name = "Remove Rule for Spell " .. name,
+          order = 110,
+          confirm = true,
+          func = function()
+            CooldownCursor:RemoveSpellRule(spellID)
+          end,
+        },
+      },
+    }
+
+    order = order + 1
+  end
+end
+
+
 
 local function AnchorValues()
   if next(anchorValues) ~= nil then
@@ -175,7 +336,7 @@ local options = {
     reset = {
       type = "execute",
       name = "Reset",
-      desc = "Reset all settings to defaults.",
+      desc = "Reset all settings to defaults, except spell rules.",
       order = 90,
       confirm = true,
       func = function() CooldownCursor:ResetSettings() end,
@@ -206,7 +367,7 @@ local options = {
 
         iconSize = {
           type = "range",
-          name = "Size",
+          name = "Global Size",
           desc = "Icon size in pixels.",
           order = 120,
           min = 16, max = 128, step = 1,
@@ -413,15 +574,175 @@ local options = {
         },
       },
     },
+    spellRulesGroup = {
+      type = "group",
+      name = "Spell Rules",
+      order = 400,
+      args = {
+
+        activeRule = {
+          type = "select",
+          name = "Active Rule Mode",
+          values = { [true] = "Whitelist", [false] = "Blacklist" },
+          desc = "Choose whether spell rules are treated as a whitelist or blacklist by default.",
+          order = 405,
+          disabled = function() return CooldownCursorDB.spellRules.settings.disableRules end,
+          get = function()
+            return CooldownCursorDB.spellRules.settings.whitelist
+          end,
+          set = function(_, v)
+            CooldownCursorDB.spellRules.settings.whitelist = v
+            CooldownCursor:UpdateDisplay()
+            CooldownCursor:RebuildSpellRuleOptions()
+            CooldownCursor:NotifyOptionsChanged()
+          end,
+        },
+
+        disableRules = {
+          type = "toggle",
+          name = "Disable All Spell Rules",
+          desc = "If enabled, all spell rules will be ignored.",
+          order = 410,
+          get = function()
+            return CooldownCursorDB.spellRules.settings.disableRules
+          end,
+          set = function(_, v)
+            CooldownCursorDB.spellRules.settings.disableRules = v
+            CooldownCursor:UpdateDisplay()
+            CooldownCursor:RebuildSpellRuleOptions()
+            CooldownCursor:NotifyOptionsChanged()
+          end,
+        },
+
+
+        header = {
+          type = "header",
+          name = "Spell Rule Editor",
+          order = 415,
+        },
+
+        description = {
+          type = "description",
+          name = "Add or update a spell rule by entering its numeric Spell ID below.",
+          order = 416,
+        },
+
+        spacer = {
+          type = "description",
+          name = " ",
+          order = 420,
+        },
+
+        spellID = {
+          type = "input",
+          name = "Spell ID",
+          desc = "Enter a numeric spell ID (e.g. 13750).",
+          order = 421,
+          width = "half",
+          get = function()
+            return tostring(CooldownCursor._newRuleSpellID or "")
+          end,
+
+          set = function(_, value)
+            local id = tonumber(value)
+            CooldownCursor._newRuleSpellID = id
+          end,
+          },
+
+        enabled = {
+          type = "select",
+          name = "Add to",
+          desc = "Choose whether to add the spell as a whitelist or blacklist rule.",
+          values = { [true] = "Whitelist", [false] = "Blacklist" },
+          order = 422,
+          get = function()
+            return CooldownCursor._newRuleEnabled ~= false
+          end,
+          set = function(_, v)
+            CooldownCursor._newRuleEnabled = v
+          end,
+        },
+
+        iconSize = {
+          type = "range",
+          name = "Icon Size",
+          order = 424,
+          min = 16, max = 128, step = 1,
+          get = function()
+            return CooldownCursor._newRuleIconSize or CooldownCursor:GetDBValue("iconSize")
+          end,
+          set = function(_, v)
+            CooldownCursor._newRuleIconSize = v
+          end,
+        },
+
+        add = {
+          type = "execute",
+          name = "Add / Update Spell Rule",
+          order = 425,
+          func = function()
+            local spellID = CooldownCursor._newRuleSpellID
+
+            if not spellID then
+              CooldownCursor._spellRuleStatusText = "Invalid Spell ID"
+              CooldownCursor._spellRuleStatusColor = "ff5555" -- red
+              CooldownCursor:NotifyOptionsChanged()
+              return
+            end
+
+            local info = C_Spell.GetSpellInfo(spellID)
+            if not info then
+              CooldownCursor._spellRuleStatusText = "Spell not found"
+              CooldownCursor._spellRuleStatusColor = "ff5555"
+              CooldownCursor:NotifyOptionsChanged()
+              return
+            end
+
+            -- Add / update rule
+            CooldownCursor:AddOrUpdateSpellRule(spellID, {
+              enabled  = CooldownCursor._newRuleEnabled ~= false,
+              iconSize = CooldownCursor._newRuleIconSize,
+            })
+
+            CooldownCursor._spellRuleStatusText =
+              ("Added: %s (%d)"):format(info.name, spellID)
+            CooldownCursor._spellRuleStatusColor = "55ff55" -- green
+
+            -- Reset inputs
+            CooldownCursor._newRuleSpellID = nil
+
+            CooldownCursor:RebuildSpellRuleOptions()
+            CooldownCursor:NotifyOptionsChanged()
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
+        statusText = {
+          type = "description",
+          name = function()
+            if not CooldownCursor._spellRuleStatusText then
+              return nil
+            end
+            return string.format(
+              "|cff%s%s|r",
+              CooldownCursor._spellRuleStatusColor,
+              CooldownCursor._spellRuleStatusText
+            )
+          end,
+          order = 424.5,
+        },
+      },
+    },
+
     maintainerGroup = {
       type = "group",
       name = "Maintainer",
-      order = 400,
+      order = 500,
       args = {
         aboutHeader = {
           type = "header",
           name = "Addon Information",
-          order = 410,
+          order = 510,
         },
 
         version = {
@@ -429,7 +750,7 @@ local options = {
           name = function()
             return "Version: |cffffffff" .. CooldownCursor:GetVersion() .. "|r"
           end,
-          order = 420,
+          order = 520,
         },
 
         author = {
@@ -437,7 +758,7 @@ local options = {
           name = function()
             return "Author: |cffffffff" .. CooldownCursor:GetAuthor() .. "|r"
           end,
-          order = 430,
+          order = 530,
         },
 
         notes = {
@@ -447,7 +768,7 @@ local options = {
             if notes == "" then return "" end
             return "Notes: |cffffffff" .. notes .. "|r"
           end,
-          order = 440,
+          order = 540,
         },
 
         spacer = { type = "description", name = " ", order = 4 },
@@ -455,7 +776,7 @@ local options = {
         website = {
           type = "input",
           name = "Website",
-          order = 450,
+          order = 550,
           width = "full",
           get = function() return "https://www.curseforge.com/wow/addons/cooldowncursor" end,
           set = function() end, -- read-only
@@ -465,7 +786,7 @@ local options = {
           type = "input",
           name = "Issues / GitHub",
           desc = "Where to report bugs / feature requests.",
-          order = 460,
+          order = 560,
           width = "full",
           get = function() return "https://github.com/jrosco/CooldownCursor/issues" end,
           set = function() end, -- read-only
@@ -474,12 +795,15 @@ local options = {
         slash = {
           type = "description",
           name = "Slash commands: |cffffffff/cdc|r or |cffffffff/cdcursor|r",
-          order = 470,
+          order = 570,
         },
       },
     },
   },
 }
+
+-- Expose options table
+CooldownCursor.options = options
 
 function CooldownCursor:OnOptionsOpened()
   -- Options Panel Opened
@@ -518,4 +842,17 @@ function CooldownCursor:InitAce3Options()
     self:OnOptionsClosed()
   end)
 
+  -- Build dynamic spell rule UI
+  self:RebuildSpellRuleOptions()
+
+  -- Tell AceConfig the table changed
+  LibStub("AceConfigRegistry-3.0"):NotifyChange("CooldownCursor")
+
+end
+
+function CooldownCursor:NotifyOptionsChanged()
+  local AceConfigRegistry = LibStub("AceConfigRegistry-3.0", true)
+  if AceConfigRegistry then
+    AceConfigRegistry:NotifyChange("CooldownCursor")
+  end
 end

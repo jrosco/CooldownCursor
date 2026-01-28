@@ -135,6 +135,14 @@ local previewTicker = nil
 ----------------------------------------------------
 -- Defaults / SavedVariables
 ----------------------------------------------------
+local spellRules = {
+  settings = {
+    whitelist = true, -- if true, only enabled rules are allowed
+    disableRules = false, -- if true, all rules are ignored
+  },
+  rules = {}
+}
+
 local defaults = {
   offsetX = 0, -- TODO: unused
   offsetY = 0, -- TODO: unused
@@ -169,6 +177,7 @@ local defaults = {
   cooldownTextAnchor = CD_TEXT_ANCHOR_POINTS.CENTER.point,
   cooldownTextAlpha = 100,
   frameStrata = FRAME_STRATA.HIGH,
+  spellRules = spellRules,
 }
 
 function CooldownCursor:ApplyDefaults()
@@ -454,7 +463,7 @@ end
 ----------------------------------------------------
 -- Apply settings and refresh active display
 ----------------------------------------------------
-function CooldownCursor:UpdateDisplay()
+function CooldownCursor:UpdateDisplay(spellID)
 
   -- Show/hide icon
   icon.icon:SetShown(not CooldownCursorDB.iconHide)
@@ -531,8 +540,9 @@ function CooldownCursor:UpdateDisplay()
 
   -- Set icon size and scale
   -- Don't scale with icon.icon:SetScale() as it messes with cursor position calculations
-  icon:SetSize(CooldownCursorDB.iconSize * (CooldownCursorDB.scale or defaults.scale),
-    CooldownCursorDB.iconSize * (CooldownCursorDB.scale or defaults.scale))
+  local size = CooldownCursor:GetEffectiveIconSize(spellID)
+  icon:SetSize(size * (CooldownCursorDB.scale or defaults.scale),
+    size * (CooldownCursorDB.scale or defaults.scale))
 
   -- Set all other scale settings
   icon.text:SetScale(CooldownCursorDB.scale or defaults.scale)
@@ -566,6 +576,34 @@ function CooldownCursor:UpdateDisplay()
       icon.icon:SetAlpha(0)
     end
   end
+end
+
+----------------------------------------------------
+-- Spell Rule Logic
+----------------------------------------------------
+function CooldownCursor:GetSpellRule(spellID)
+  local data = CooldownCursorDB.spellRules
+
+  if not data or not data.rules then return true end
+
+  if data.settings.disableRules then return true end
+
+  local rules = data.rules
+  if not next(rules) then return true end
+
+  local rule = rules[spellID]
+
+  -- Whitelist mode
+  if data.settings.whitelist then
+    return rule and rule.enabled ~= false, rule
+  end
+
+  -- Blacklist mode
+  if rule and rule.enabled == false then
+    return false
+  end
+
+  return true, rule
 end
 
 ----------------------------------------------------
@@ -667,6 +705,74 @@ end
 function CooldownCursor:SetDBBoolean(key, value)
   CooldownCursorDB[key] = value and true or false
   self:UpdateDisplay()
+end
+
+function CooldownCursor:AddOrUpdateSpellRule(spellID, ruleData)
+  -- Validate spellID
+  spellID = tonumber(spellID)
+  if not spellID then
+    return false, "Invalid spell ID"
+  end
+
+  local spellName = C_Spell.GetSpellInfo(spellID)
+  if not spellName then
+    return false, "Unknown spell ID"
+  end
+
+  -- Ensure root table exists
+  CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or {}
+  CooldownCursorDB.spellRules.settings = CooldownCursorDB.spellRules.settings or {}
+  CooldownCursorDB.spellRules.rules = CooldownCursorDB.spellRules.rules or {}
+
+  local rules = CooldownCursorDB.spellRules.rules
+
+  -- Create rule if missing
+  rules[spellID] = rules[spellID] or {}
+
+  -- Apply fields (partial update safe)
+  for k, v in pairs(ruleData or {}) do
+    rules[spellID][k] = v
+  end
+
+  return true, spellName
+end
+
+function CooldownCursor:RemoveSpellRule(spellID)
+  if not CooldownCursorDB.spellRules
+    or not CooldownCursorDB.spellRules.rules then
+    return
+  end
+
+  CooldownCursorDB.spellRules.rules[spellID] = nil
+  CooldownCursor:UpdateDisplay()
+  CooldownCursor:RebuildSpellRuleOptions()
+  CooldownCursor:NotifyOptionsChanged()
+end
+
+function CooldownCursor:GetEffectiveIconSize(spellID)
+  local globalSize = self:GetDBValue("iconSize")
+  local rulesData = CooldownCursorDB.spellRules
+
+  if not rulesData or not rulesData.rules then
+    return globalSize
+  end
+
+  local rule = rulesData.rules[spellID]
+  if not rule then
+    return globalSize
+  end
+
+  -- Per-spell global toggle
+  if rule.useGlobalIconSize ~= false then
+    return globalSize
+  end
+
+  -- Per-spell override
+  if rule.iconSize then
+    return rule.iconSize
+  end
+
+  return globalSize
 end
 
 -- Set font names and paths in the SavedVariables table
@@ -790,10 +896,12 @@ end
 
 function CooldownCursor:ResetSettings()
   CooldownCursor:HideIconNow()
+  local rules = CooldownCursorDB.spellRules
   CooldownCursorDB = {}
   self:ApplyDefaults()
   self:UpdateDisplay()
   CooldownCursor:SetPreviewMouseMode(false)
+  CooldownCursorDB.spellRules = rules -- Preserve spell rules
 end
 
 ----------------------------------------------------
@@ -804,7 +912,7 @@ local function ShowSpellIcon(spellID, startTime, duration)
   if not spellInfo or not spellInfo.iconID then return end
 
   -- Apply settings before showing
-  CooldownCursor:UpdateDisplay()
+  CooldownCursor:UpdateDisplay(spellID)
 
   -- Pop in animation
   if CooldownCursorDB.animation then
@@ -876,7 +984,8 @@ function CooldownCursor:ApplyPreviewPosition()
     icon:SetScript("OnUpdate", nil)
     icon:SetFrameStrata("HIGH")
     icon:ClearAllPoints()
-    icon:SetPoint("LEFT", SettingsPanel, "RIGHT", 8, 0)
+    local anchor = SettingsPanel or UIParent
+    icon:SetPoint("LEFT", anchor, "RIGHT", 8, 0)
   end
 end
 
@@ -896,11 +1005,17 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
 
   if event == "PLAYER_REGEN_DISABLED" then
     inCombat = true
+    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT then
+      CooldownCursor:HideIconNow()
+    end
     return
   end
 
   if event == "PLAYER_REGEN_ENABLED" then
     inCombat = false
+    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT then
+      CooldownCursor:HideIconNow()
+    end
     return
   end
 
@@ -926,6 +1041,10 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     if usable == false or inRange == false then return end
     if not cd or not cd.startTime or not cd.duration or cd.isOnGCD then return end
 
+    -- Check spell rules
+    local show, rule = CooldownCursor:GetSpellRule(spellID)
+    if not show then return end
+
     -- Different spell overrides current display immediately
     if lastSpellId and lastSpellId ~= spellID then
       CooldownCursor:HideIconNow()
@@ -934,6 +1053,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     lastSpellId = spellID
     ShowSpellIcon(spellID, cd.startTime, cd.duration)
   end
+
 end)
 
 ----------------------------------------------------

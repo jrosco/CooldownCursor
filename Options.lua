@@ -290,7 +290,7 @@ local options = {
       name = "Hide After (seconds)",
       desc = "How long the icon stays visible before hiding.",
       order = 40,
-      min = 0.5, max = 30, step = 0.1,
+      min = 1, max = 120, step = 1,
       get = function() return CooldownCursor:GetDBValue("hideAfter") end,
       set = function(_, v) CooldownCursor:SetHideAfter(v) end,
     },

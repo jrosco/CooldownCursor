@@ -907,7 +907,7 @@ end
 ----------------------------------------------------
 -- Show icon + cooldown
 ----------------------------------------------------
-local function ShowSpellIcon(spellID, objectiveDuration)
+local function ShowSpellIcon(spellID, desaturated, durationObject)
   local spellInfo = C_Spell.GetSpellInfo(spellID)
   if not spellInfo or not spellInfo.iconID then return end
 
@@ -922,7 +922,7 @@ local function ShowSpellIcon(spellID, objectiveDuration)
   end
 
   icon.icon:SetTexture(spellInfo.iconID)
-  icon.cooldown:SetCooldownFromDurationObject(objectiveDuration) -- https://warcraft.wiki.gg/wiki/API_Cooldown_SetCooldownFromDurationObject
+  icon.cooldown:SetCooldownFromDurationObject(durationObject) -- https://warcraft.wiki.gg/wiki/API_Cooldown_SetCooldownFromDurationObject
 
   activeSpellID = spellID
 
@@ -953,8 +953,8 @@ end
 function CooldownCursor:Preview()
   local previewSpellID = 116 -- Frostbolt (safe)
   local previewDuration = 30
-  local durationObj = C_DurationUtil.CreateDuration() -- https://warcraft.wiki.gg/wiki/API_C_DurationUtil.CreateDuration
-  durationObj:SetTimeFromStart(GetTime(), previewDuration)
+  local durationObject = C_DurationUtil.CreateDuration() -- https://warcraft.wiki.gg/wiki/API_C_DurationUtil.CreateDuration
+  durationObject:SetTimeFromStart(GetTime(), previewDuration)
 
   if previewActive then
     previewActive = false
@@ -968,12 +968,12 @@ function CooldownCursor:Preview()
 
 
   previewActive = true
-  ShowSpellIcon(previewSpellID, durationObj)
+  ShowSpellIcon(previewSpellID, false, durationObject)
   CooldownCursor:ApplyPreviewPosition()
 
-  previewTicker = C_Timer.NewTicker(durationObj:GetRemainingDuration(0), function()
+  previewTicker = C_Timer.NewTicker(durationObject:GetRemainingDuration(0), function()
     if previewActive and icon:IsShown() then
-      icon.cooldown:SetCooldown(durationObj)
+      icon.cooldown:SetCooldownFromDurationObject(durationObject)
     end
   end)
 end
@@ -1022,7 +1022,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
-  if event == "UNIT_SPELLCAST_FAILED" then
+  if event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" then
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
       return
     end
@@ -1038,24 +1038,27 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     local unit, _, spellID = ...
     if unit ~= "player" or not spellID then return end
 
-    local cd = C_Spell.GetSpellCooldown(spellID)
-    local durationObject = C_Spell.GetSpellCooldownDuration(spellID) -- https://warcraft.wiki.gg/wiki/ScriptObject_DurationObject
-    local usable = C_Spell.IsSpellUsable(spellID)
-    local inRange = C_Spell.IsSpellInRange(spellID)
-    if usable == false or inRange == false then return end
-    if not cd or cd.isOnGCD or not durationObject then return end
+    -- Delay slightly to allow cooldown to register
+    C_Timer.After(0.05, function()
+      local cd = C_Spell.GetSpellCooldown(spellID)
+      local durationObject = C_Spell.GetSpellCooldownDuration(spellID) -- https://warcraft.wiki.gg/wiki/ScriptObject_DurationObject
+      local usable = C_Spell.IsSpellUsable(spellID)
+      local inRange = C_Spell.IsSpellInRange(spellID)
+      if usable == false or inRange == false then return end
+      if not cd or cd.isOnGCD or not durationObject then return end
 
-    -- Check spell rules
-    local show, rule = CooldownCursor:GetSpellRule(spellID)
-    if not show then return end
+      -- Check spell rules
+      local show, rule = CooldownCursor:GetSpellRule(spellID)
+      if not show then return end
 
-    -- Different spell overrides current display immediately
-    if lastSpellId and lastSpellId ~= spellID then
-      CooldownCursor:HideIconNow()
-    end
+      -- Different spell overrides current display immediately
+      if lastSpellId and lastSpellId ~= spellID then
+        CooldownCursor:HideIconNow()
+      end
 
-    lastSpellId = spellID
-    ShowSpellIcon(spellID, durationObject)
+      lastSpellId = spellID
+      ShowSpellIcon(spellID, desaturated, durationObject)
+    end)
   end
 
 end)
@@ -1064,6 +1067,7 @@ end)
 -- Register events
 ----------------------------------------------------
 CooldownCursor:RegisterEvent("ADDON_LOADED")
+CooldownCursor:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_FAILED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_DISABLED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_ENABLED")

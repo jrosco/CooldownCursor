@@ -907,7 +907,7 @@ end
 ----------------------------------------------------
 -- Show icon + cooldown
 ----------------------------------------------------
-local function ShowSpellIcon(spellID, startTime, duration)
+local function ShowSpellIcon(spellID, objectiveDuration)
   local spellInfo = C_Spell.GetSpellInfo(spellID)
   if not spellInfo or not spellInfo.iconID then return end
 
@@ -922,7 +922,7 @@ local function ShowSpellIcon(spellID, startTime, duration)
   end
 
   icon.icon:SetTexture(spellInfo.iconID)
-  icon.cooldown:SetCooldown(startTime, duration)
+  icon.cooldown:SetCooldownFromDurationObject(objectiveDuration) -- https://warcraft.wiki.gg/wiki/API_Cooldown_SetCooldownFromDurationObject
 
   activeSpellID = spellID
 
@@ -953,6 +953,8 @@ end
 function CooldownCursor:Preview()
   local previewSpellID = 116 -- Frostbolt (safe)
   local previewDuration = 30
+  local durationObj = C_DurationUtil.CreateDuration() -- https://warcraft.wiki.gg/wiki/API_C_DurationUtil.CreateDuration
+  durationObj:SetTimeFromStart(GetTime(), previewDuration)
 
   if previewActive then
     previewActive = false
@@ -964,13 +966,14 @@ function CooldownCursor:Preview()
     return
   end
 
+
   previewActive = true
-  ShowSpellIcon(previewSpellID, GetTime(), previewDuration)
+  ShowSpellIcon(previewSpellID, durationObj)
   CooldownCursor:ApplyPreviewPosition()
 
-  previewTicker = C_Timer.NewTicker(previewDuration, function()
+  previewTicker = C_Timer.NewTicker(durationObj:GetRemainingDuration(0), function()
     if previewActive and icon:IsShown() then
-      icon.cooldown:SetCooldown(GetTime(), previewDuration)
+      icon.cooldown:SetCooldown(durationObj)
     end
   end)
 end
@@ -1036,10 +1039,11 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     if unit ~= "player" or not spellID then return end
 
     local cd = C_Spell.GetSpellCooldown(spellID)
+    local durationObject = C_Spell.GetSpellCooldownDuration(spellID) -- https://warcraft.wiki.gg/wiki/ScriptObject_DurationObject
     local usable = C_Spell.IsSpellUsable(spellID)
     local inRange = C_Spell.IsSpellInRange(spellID)
     if usable == false or inRange == false then return end
-    if not cd or not cd.startTime or not cd.duration or cd.isOnGCD then return end
+    if not cd or cd.isOnGCD or not durationObject then return end
 
     -- Check spell rules
     local show, rule = CooldownCursor:GetSpellRule(spellID)
@@ -1051,7 +1055,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
 
     lastSpellId = spellID
-    ShowSpellIcon(spellID, cd.startTime, cd.duration)
+    ShowSpellIcon(spellID, durationObject)
   end
 
 end)

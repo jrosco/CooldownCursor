@@ -2,7 +2,7 @@
 ## Title: CooldownCursor
 ## Notes: Shows cooldown timers at your cursor position
 ## Author: jrosco
-## Version: 1.2.3
+## Version: 1.2.4
 ## SavedVariables: CooldownCursorDB
 ## OptionalDeps: Masque
 

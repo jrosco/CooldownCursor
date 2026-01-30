@@ -666,6 +666,19 @@ local function ScheduleHideTimer()
 end
 
 ----------------------------------------------------
+-- Internal Check if secret helper
+----------------------------------------------------
+local function IsSecretValue(value)
+    local valueType = type(value)
+    if valueType == "number" then
+        -- try to perform an operation that would fail on a secret value
+        local success = pcall(function() return value == 0 end)
+        return not success
+    end
+    return false
+end
+
+----------------------------------------------------
 -- Settings API
 ----------------------------------------------------
 
@@ -907,7 +920,7 @@ end
 ----------------------------------------------------
 -- Show icon + cooldown
 ----------------------------------------------------
-local function ShowSpellIcon(spellID, desaturated, durationObject)
+local function ShowSpellIcon(spellID, durationObject)
   local spellInfo = C_Spell.GetSpellInfo(spellID)
   if not spellInfo or not spellInfo.iconID then return end
 
@@ -1045,6 +1058,12 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       local usable = C_Spell.IsSpellUsable(spellID)
       local inRange = C_Spell.IsSpellInRange(spellID)
       if usable == false or inRange == false then return end
+
+      -- ignore spells with no cooldown
+      -- will only checks out-of-combat cooldowns
+      -- in-combat cooldowns are handled via isOnGCD check
+      if not IsSecretValue(cd.startTime) and cd.startTime == 0 then return end
+
       if not cd or cd.isOnGCD or not durationObject then return end
 
       -- Check spell rules
@@ -1057,7 +1076,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       end
 
       lastSpellId = spellID
-      ShowSpellIcon(spellID, desaturated, durationObject)
+      ShowSpellIcon(spellID, durationObject)
     end)
   end
 

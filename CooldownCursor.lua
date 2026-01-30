@@ -14,7 +14,6 @@ local activeSpellID = nil
 local inCombat = false
 local fontsTable = {}
 local previewMouseMode = false
-local cachedCDSpells = {}
 
 local SHOW_WHEN_STATE = {
   ALWAYS = 0,
@@ -982,7 +981,7 @@ function CooldownCursor:Preview()
 
 
   previewActive = true
-  ShowSpellIcon(previewSpellID, durationObject)
+  ShowSpellIcon(previewSpellID, false, durationObject)
   CooldownCursor:ApplyPreviewPosition()
 
   previewTicker = C_Timer.NewTicker(durationObject:GetRemainingDuration(0), function()
@@ -1036,11 +1035,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
-  if event == "UNIT_SPELLCAST_FAILED"
-    or event == "UNIT_SPELLCAST_SUCCEEDED"
-    or event == "SPELL_UPDATE_COOLDOWN" then
-    local spellID
-    local unit
+  if event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" then
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
       return
     end
@@ -1053,19 +1048,8 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       return
     end
 
-    -- SPELL_UPDATE_COOLDOWN will update cooldown
-    -- that buffs, talents or items may cause.
-    if event == "SPELL_UPDATE_COOLDOWN" then
-      spellID, _, _, _ = ...
-    else
-      unit, _, spellID = ...
-      -- Cache spellID that are not SPELL_UPDATE_COOLDOWN events
-      -- This allows only tracking spells that have triggered the icon display
-      table.insert(cachedCDSpells, spellID, true)
-      if unit ~= "player" then return end
-    end
-
-    if not spellID or not cachedCDSpells[spellID] then return end
+    local unit, _, spellID = ...
+    if unit ~= "player" or not spellID then return end
 
     -- Delay slightly to allow cooldown to register
     C_Timer.After(0.05, function()
@@ -1102,7 +1086,6 @@ end)
 -- Register events
 ----------------------------------------------------
 CooldownCursor:RegisterEvent("ADDON_LOADED")
-CooldownCursor:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_FAILED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_DISABLED")

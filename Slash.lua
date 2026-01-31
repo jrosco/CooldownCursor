@@ -67,7 +67,7 @@ end
 ----------------------------------------------------
 local handlers = {}
 
--- Adding a new command 
+-- Adding a new command
 -- handlers.newcmd = function(...) ... end
 
 handlers.help = function()
@@ -139,10 +139,10 @@ handlers.icon = function(arg1, arg2)
     CooldownCursor:SetDBString("anchor", pos)
     Print("anchor set to:", pos)
   elseif arg1 == "size" then
-     local n = ToNum(arg2)
-     if not n then return Usage("/cdcursor icon size <number>") end
-     CooldownCursor:SetDBNumber("iconSize", n)
-     Print("icon size set to:", n)
+    local n = ToNum(arg2)
+    if not n then return Usage("/cdcursor icon size <number>") end
+    CooldownCursor:SetDBNumber("iconSize", n)
+    Print("icon size set to:", n)
   elseif arg1 == "swipe" then
     local toggle = ToggleBool(CooldownCursor:GetDBValue("showCooldownSwipe"))
     CooldownCursor:SetDBBoolean("showCooldownSwipe", toggle)
@@ -237,7 +237,8 @@ handlers.number = function(arg1, arg2)
     local ftype = string.upper(arg2)
     if not CooldownCursor:GetValidFontType(ftype) then
       Print("invalid font type:", ftype)
-      Print("/cdcursor number ftype <outline||thickoutline||monochrome||monochromeoutline||monochromethickoutline||none>")
+      Print(
+      "/cdcursor number ftype <outline||thickoutline||monochrome||monochromeoutline||monochromethickoutline||none>")
       return
     end
     CooldownCursor:SetDBString("cooldownTextFontType", ftype)
@@ -250,7 +251,7 @@ handlers.number = function(arg1, arg2)
   elseif arg1 == "toggle" then
     local toggle = ToggleBool(CooldownCursor:GetDBValue("hideCooldownNumbers"))
     CooldownCursor:SetDBBoolean("hideCooldownNumbers", toggle)
-    Print("cooldown numbers now",toggle and "hidden" or "shown")
+    Print("cooldown numbers now", toggle and "hidden" or "shown")
   else
     Usage("/cdcursor number <alpha||anchor||color||font||ftype||size||toggle>")
   end

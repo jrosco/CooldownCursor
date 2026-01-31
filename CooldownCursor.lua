@@ -236,6 +236,7 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- fixes
   table.insert(fixes, "Fixed SPELL_UPDATE_COOLDOWN not triggering spells with CD Buff updates (v2.0.0)")
   table.insert(fixes, "Fixed Masque skin/style when showing multiple icon display (v2.0.1)")
+  table.insert(fixes, "Fixed Minor bug fixes (v2.0.3)")
 
   -- Store for Options.lua to display
   self.releaseNotes = {
@@ -1519,7 +1520,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       unit, _, spellID = ...
       -- Cache spellID that are not SPELL_UPDATE_COOLDOWN events
       -- This allows only tracking spells that have triggered the icon display
-      if tonumber(spellID) then table.insert(cachedCDSpells, spellID, true) end
+      if not IsSecretValue(spellID) and type(spellID) == "number" then table.insert(cachedCDSpells, spellID, true) end
       if unit ~= "player" then return end
     end
     if not spellID or not cachedCDSpells[spellID] then return end

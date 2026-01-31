@@ -125,8 +125,8 @@ function CooldownCursor:RebuildSpellRuleOptions()
           step = 1,
           disabled = function()
             return CooldownCursor:GetDBValue("stackDirection") == "SINGLE" or
-                   CooldownCursorDB.spellRules.settings.disableRules or
-                   rule.enabled == false
+                CooldownCursorDB.spellRules.settings.disableRules or
+                rule.enabled == false
           end,
           get = function()
             return rule.priority or 0
@@ -154,7 +154,9 @@ function CooldownCursor:RebuildSpellRuleOptions()
           type = "range",
           name = "Icon Size",
           order = 22,
-          min = 16, max = 128, step = 1,
+          min = 16,
+          max = 128,
+          step = 1,
           disabled = function()
             return rule.useGlobalIconSize ~= false or rule.enabled == false
           end,
@@ -211,7 +213,7 @@ local function AnchorValues()
   if next(anchorValues) ~= nil then
     -- return cached values
     return anchorValues
-  end 
+  end
   for _, a in ipairs(CooldownCursor:GetValidAnchorPositions()) do
     anchorValues[a] = a
   end
@@ -252,9 +254,9 @@ local function HexColorGet(key, fallbackHex)
   -- AceConfig color expects r,g,b,a in 0..1
   local hex = (CooldownCursor:GetDBValue(key) or fallbackHex or "ffffff"):gsub("#", "")
   if #hex ~= 6 then hex = "ffffff" end
-  local r = tonumber(hex:sub(1,2), 16) / 255
-  local g = tonumber(hex:sub(3,4), 16) / 255
-  local b = tonumber(hex:sub(5,6), 16) / 255
+  local r = tonumber(hex:sub(1, 2), 16) / 255
+  local g = tonumber(hex:sub(3, 4), 16) / 255
+  local b = tonumber(hex:sub(5, 6), 16) / 255
   return r, g, b, 1
 end
 
@@ -271,7 +273,7 @@ local options = {
   type = "group",
   name = name,
   args = {
-    
+
     -- header = {
     --   type = "header",
     --   name = "Options",
@@ -281,23 +283,23 @@ local options = {
       type = "execute",
       name = "Toggle Preview",
       desc = "Click to see your current settings in action!\n\n" ..
-              "The preview will loop continuously until you click again to turn it off.",
+          "The preview will loop continuously until you click again to turn it off.",
       order = 50,
       width = "normal",
       func = function() CooldownCursor:Preview() end,
     },
-    
+
     previewMouse = {
       type = "toggle",
       name = "Preview Follows Cursor",
       desc = "Make the preview icons follow your mouse cursor.\n\n" ..
-              "When disabled, icons appear next to the settings panel.",
+          "When disabled, icons appear next to the settings panel.",
       order = 60,
       width = "normal",
       get = function() return CooldownCursor:GetPreviewMouseMode() end,
       set = function(_, v) CooldownCursor:SetPreviewMouseMode(v) end,
     },
-    
+
     -- ========================================
     -- QUICK SETTINGS TAB
     -- ========================================
@@ -306,35 +308,35 @@ local options = {
       name = "Common Settings",
       order = 0,
       args = {
-        
+
         welcomeHeader = {
           type = "header",
           name = "Common Settings",
           order = 1,
         },
-        
+
         description = {
           type = "description",
           name = "|cff00ff00Quick access to the most commonly used settings.|r\n" ..
-                 "These are the essential settings to get started!\n" ..
-                 "Configure these first, then explore other tabs for advanced options.",
+              "These are the essential settings to get started!\n" ..
+              "Configure these first, then explore other tabs for advanced options.",
           order = 2,
         },
-        
+
         spacer1 = {
           type = "description",
           name = " ",
           order = 5,
         },
-        
+
         displayMode = {
           type = "select",
           name = "Display Mode",
           desc = "How cooldown icons appear:\n\n" ..
-                 "• SINGLE - Shows only the most recent cooldown (recommended for beginners)\n" ..
-                 "• VERTICAL - Stack multiple cooldowns vertically\n" ..
-                 "• HORIZONTAL - Stack multiple cooldowns horizontally\n" ..
-                 "• RADIUS - Arrange multiple cooldowns in a circle around cursor",
+              "• SINGLE - Shows only the most recent cooldown (recommended for beginners)\n" ..
+              "• VERTICAL - Stack multiple cooldowns vertically\n" ..
+              "• HORIZONTAL - Stack multiple cooldowns horizontally\n" ..
+              "• RADIUS - Arrange multiple cooldowns in a circle around cursor",
           order = 10,
           width = "normal",
           values = function()
@@ -347,7 +349,7 @@ local options = {
             CooldownCursor:SetDBString("stackDirection", v)
           end,
         },
-        
+
         modeInfo = {
           type = "description",
           name = function()
@@ -363,13 +365,13 @@ local options = {
           end,
           order = 15,
         },
-        
+
         spacer2 = {
           type = "description",
           name = " ",
           order = 18,
         },
-        
+
         showWhen = {
           type = "select",
           name = "Show Icons",
@@ -380,19 +382,21 @@ local options = {
           get = function() return CooldownCursor:GetDBValue("showWhen") end,
           set = function(_, v) CooldownCursor:SetDBNumber("showWhen", v) end,
         },
-        
+
         hideAfter = {
           type = "range",
           name = "Auto-Hide After",
           desc = "Icons automatically disappear after this many seconds.\n\n" ..
-                 "Tip: Set to 30-60 seconds to track important cooldowns longer.",
+              "Tip: Set to 30-60 seconds to track important cooldowns longer.",
           order = 30,
           width = "normal",
-          min = 1, max = 120, step = 1,
+          min = 1,
+          max = 120,
+          step = 1,
           get = function() return CooldownCursor:GetDBValue("hideAfter") end,
           set = function(_, v) CooldownCursor:SetHideAfter(v) end,
         },
-        
+
         hideWhileMounted = {
           type = "toggle",
           name = "Hide While Mounted",
@@ -402,7 +406,7 @@ local options = {
           get = function() return CooldownCursor:GetDBValue("hideWhileMounted") end,
           set = function(_, v) CooldownCursor:SetDBBoolean("hideWhileMounted", v) end,
         },
-        
+
         spacer3 = {
           type = "description",
           name = " ",
@@ -415,8 +419,8 @@ local options = {
           name = "Release Notes",
           order = 100,
         },
-        
-        
+
+
         releaseNotesDesc = {
           type = "description",
           name = function()
@@ -424,10 +428,10 @@ local options = {
             if not CooldownCursor.releaseNotes then
               return "Check back after the next update for release notes."
             end
-            
+
             local notes = CooldownCursor.releaseNotes
             local lines = {}
-            
+
             -- Breaking Changes
             if notes.breakingChanges and #notes.breakingChanges > 0 then
               table.insert(lines, "|cffFF1E34 Breaking Changes:|r")
@@ -436,7 +440,7 @@ local options = {
               end
               table.insert(lines, "")
             end
-            
+
             -- New Features
             if notes.newFeatures and #notes.newFeatures > 0 then
               if #lines > 0 then table.insert(lines, "") end
@@ -446,7 +450,7 @@ local options = {
               end
               table.insert(lines, "")
             end
-            
+
             -- Fixes
             if notes.fixes and #notes.fixes > 0 then
               if #lines > 0 then table.insert(lines, "") end
@@ -455,12 +459,12 @@ local options = {
                 table.insert(lines, "• " .. fix)
               end
             end
-            
+
             -- If no categories have content
             if #lines == 0 then
               return "No release notes for this version."
             end
-            
+
             return table.concat(lines, "\n")
           end,
           order = 101,
@@ -468,7 +472,7 @@ local options = {
         },
       },
     },
-    
+
     -- ========================================
     -- APPEARANCE TAB
     -- ========================================
@@ -477,56 +481,62 @@ local options = {
       name = "Appearance",
       order = 100,
       args = {
-        
+
         header = {
           type = "header",
           name = "Icon Appearance",
           order = 1,
         },
-        
+
         description = {
           type = "description",
           name = "Customize how cooldown icons look.",
           order = 2,
         },
-        
+
         spacer1 = {
           type = "description",
           name = " ",
           order = 5,
         },
-        
+
         iconSize = {
           type = "range",
           name = "Icon Size",
           desc = "Size of the cooldown icon in pixels.\n\n" ..
-                 "Recommended: 48-64 for most setups.",
+              "Recommended: 48-64 for most setups.",
           order = 10,
           width = "normal",
-          min = 16, max = 128, step = 1,
+          min = 16,
+          max = 128,
+          step = 1,
           get = function() return CooldownCursor:GetDBValue("iconSize") end,
           set = function(_, v) CooldownCursor:SetDBNumber("iconSize", v) end,
         },
-        
+
         scale = {
           type = "range",
           name = "Scale",
           desc = "Overall scale multiplier for icon and text.\n\n" ..
-                 "Use this to make everything bigger or smaller proportionally.",
+              "Use this to make everything bigger or smaller proportionally.",
           order = 20,
           width = "normal",
-          min = 0.5, max = 5, step = 0.05,
+          min = 0.5,
+          max = 5,
+          step = 0.05,
           get = function() return CooldownCursor:GetDBValue("scale") end,
           set = function(_, v) CooldownCursor:SetDBNumber("scale", v) end,
         },
-        
+
         iconAlpha = {
           type = "range",
           name = "Icon Transparency",
           desc = "How see-through the icon is (0 = invisible, 100 = solid).",
           order = 30,
           width = "normal",
-          min = 0, max = 100, step = 5,
+          min = 0,
+          max = 100,
+          step = 5,
           get = function() return CooldownCursor:GetDBValue("iconAlpha") end,
           set = function(_, v) CooldownCursor:SetDBNumber("iconAlpha", v) end,
         },
@@ -535,29 +545,29 @@ local options = {
           type = "select",
           name = "Frame Strata",
           desc = "Controls if icons appear above or below other UI elements.\n\n" ..
-                 "HIGH (recommended) - Above most UI\n" ..
-                 "DIALOG - Above everything\n" ..
-                 "MEDIUM - Standard UI level\n\n" ..
-                 "Change this if icons are appearing behind other frames.",
+              "HIGH (recommended) - Above most UI\n" ..
+              "DIALOG - Above everything\n" ..
+              "MEDIUM - Standard UI level\n\n" ..
+              "Change this if icons are appearing behind other frames.",
           order = 35,
           width = "normal",
           values = FrameStrataValues,
           get = function() return CooldownCursor:GetDBValue("frameStrata") end,
           set = function(_, v) CooldownCursor:SetDBString("frameStrata", v) end,
         },
-        
+
         spacer2 = {
           type = "description",
           name = " ",
           order = 35,
         },
-        
+
         visualHeader = {
           type = "header",
           name = "Visual Effects",
           order = 40,
         },
-        
+
         animation = {
           type = "toggle",
           name = "Pop Animation",
@@ -567,19 +577,21 @@ local options = {
           get = function() return CooldownCursor:GetDBValue("animation") end,
           set = function(_, v) CooldownCursor:SetDBBoolean("animation", v) end,
         },
-        
+
         fadeOutDuration = {
           type = "range",
           name = "Fade Out Duration",
           desc = "How long icons take to fade out when hiding (in seconds).\n\n" ..
-                 "Set to 0 for instant disappear.",
+              "Set to 0 for instant disappear.",
           order = 55,
           width = "normal",
-          min = 0, max = 3, step = 0.05,
+          min = 0,
+          max = 3,
+          step = 0.05,
           get = function() return CooldownCursor:GetDBValue("fadeOutDuration") end,
           set = function(_, v) CooldownCursor:SetFadeOutDuration(v) end,
         },
-        
+
         showCooldownSwipe = {
           type = "toggle",
           name = "Cooldown Swipe",
@@ -589,53 +601,55 @@ local options = {
           get = function() return CooldownCursor:GetDBValue("showCooldownSwipe") end,
           set = function(_, v) CooldownCursor:SetDBBoolean("showCooldownSwipe", v) end,
         },
-        
+
         iconHide = {
           type = "toggle",
           name = "Hide Icon Texture",
           desc = "Only show the cooldown numbers/text, not the spell icon.\n\n" ..
-                 "Useful for minimalist setups.",
+              "Useful for minimalist setups.",
           order = 70,
           width = "normal",
           get = function() return CooldownCursor:GetDBValue("iconHide") end,
           set = function(_, v) CooldownCursor:SetDBBoolean("iconHide", v) end,
         },
-        
+
         spacer3 = {
           type = "description",
           name = " ",
           order = 75,
         },
-        
+
         positionHeader = {
           type = "header",
           name = "Position",
           order = 80,
         },
-        
+
         anchor = {
           type = "select",
           name = "Anchor Point",
           desc = "Where to position the icon relative to your cursor.\n\n" ..
-                 "TOPLEFT = Icon appears above and left of cursor",
+              "TOPLEFT = Icon appears above and left of cursor",
           order = 90,
           width = "normal",
           values = AnchorValues,
           get = function() return CooldownCursor:GetDBValue("anchor") end,
           set = function(_, v) CooldownCursor:SetDBString("anchor", v) end,
         },
-        
+
         anchorPadding = {
           type = "range",
           name = "Cursor Distance",
           desc = "How far from the cursor the icon appears (in pixels).",
           order = 100,
           width = "normal",
-          min = 0, max = 100, step = 1,
+          min = 0,
+          max = 100,
+          step = 1,
           get = function() return CooldownCursor:GetDBValue("anchorPadding") end,
           set = function(_, v) CooldownCursor:SetDBNumber("anchorPadding", v) end,
         },
-        
+
         -- TODO: Working on better offset controls
         -- offsetX = {
         --   type = "range",
@@ -647,7 +661,7 @@ local options = {
         --   get = function() return CooldownCursor:GetDBValue("offsetX") end,
         --   set = function(_, v) CooldownCursor:SetDBNumber("offsetX", v) end,
         -- },
-        
+
         -- offsetY = {
         --   type = "range",
         --   name = "Vertical Offset",
@@ -658,10 +672,10 @@ local options = {
         --   get = function() return CooldownCursor:GetDBValue("offsetY") end,
         --   set = function(_, v) CooldownCursor:SetDBNumber("offsetY", v) end,
         -- },
-        
+
       },
     },
-    
+
     -- ========================================
     -- LAYOUT TAB (Multi-Icon)
     -- ========================================
@@ -670,20 +684,20 @@ local options = {
       name = "Layout",
       order = 200,
       args = {
-        
+
         header = {
           type = "header",
           name = "Multi-Icon Layout",
           order = 1,
         },
-        
+
         description = {
           type = "description",
           name = "Configure how multiple cooldown icons are arranged.\n\n" ..
-                 "|cffaaaaaaTip: These settings only apply when Display Mode is set to VERTICAL, HORIZONTAL, or RADIUS.|r",
+              "|cffaaaaaaTip: These settings only apply when Display Mode is set to VERTICAL, HORIZONTAL, or RADIUS.|r",
           order = 2,
         },
-        
+
         spacer1 = {
           type = "description",
           name = " ",
@@ -694,10 +708,10 @@ local options = {
           type = "select",
           name = "Display Mode",
           desc = "How cooldown icons appear:\n\n" ..
-                 "• SINGLE - Shows only the most recent cooldown (recommended for beginners)\n" ..
-                 "• VERTICAL - Stack multiple cooldowns vertically\n" ..
-                 "• HORIZONTAL - Stack multiple cooldowns horizontally\n" ..
-                 "• RADIUS - Arrange multiple cooldowns in a circle around cursor",
+              "• SINGLE - Shows only the most recent cooldown (recommended for beginners)\n" ..
+              "• VERTICAL - Stack multiple cooldowns vertically\n" ..
+              "• HORIZONTAL - Stack multiple cooldowns horizontally\n" ..
+              "• RADIUS - Arrange multiple cooldowns in a circle around cursor",
           order = 10,
           width = "normal",
           values = function()
@@ -710,26 +724,28 @@ local options = {
             CooldownCursor:SetDBString("stackDirection", v)
           end,
         },
-        
+
         maxIcons = {
           type = "range",
           name = "Maximum Icons",
           desc = "How many cooldown icons to show at once.\n\n" ..
-                 "When you have more cooldowns than this, the oldest/lowest priority icons are removed.",
+              "When you have more cooldowns than this, the oldest/lowest priority icons are removed.",
           order = 10,
           width = "normal",
-          min = 1, max = 10, step = 1,
+          min = 1,
+          max = 10,
+          step = 1,
           disabled = function()
             return CooldownCursor:GetDBValue("stackDirection") == "SINGLE"
           end,
-          get = function() 
+          get = function()
             return CooldownCursor:GetDBValue("maxIcons")
           end,
           set = function(_, v)
             CooldownCursor:SetDBNumber("maxIcons", v)
           end,
         },
-        
+
         stackGrowth = {
           type = "select",
           name = "Growth Direction",
@@ -749,27 +765,29 @@ local options = {
             CooldownCursor:SetDBString("stackGrowth", v)
           end,
         },
-        
+
         spacer2 = {
           type = "description",
           name = " ",
           order = 25,
         },
-        
+
         stackingHeader = {
           type = "header",
           name = "Vertical / Horizontal Spacing",
           order = 30,
         },
-        
+
         stackSpacing = {
           type = "range",
           name = "Icon Spacing",
           desc = "Gap between stacked icons in pixels.\n\n" ..
-                 "Only applies to VERTICAL and HORIZONTAL modes.",
+              "Only applies to VERTICAL and HORIZONTAL modes.",
           order = 40,
           width = "normal",
-          min = -20, max = 20, step = 1,
+          min = -20,
+          max = 20,
+          step = 1,
           disabled = function()
             local dir = CooldownCursor:GetDBValue("stackDirection")
             return dir == "RADIUS" or dir == "SINGLE"
@@ -781,27 +799,29 @@ local options = {
             CooldownCursor:SetDBNumber("stackSpacing", v)
           end,
         },
-        
+
         spacer3 = {
           type = "description",
           name = " ",
           order = 45,
         },
-        
+
         radiusHeader = {
           type = "header",
           name = "Radius Settings",
           order = 50,
         },
-        
+
         radiusDistance = {
           type = "range",
           name = "Circle Radius",
           desc = "Distance from cursor for radius layout (in pixels).\n\n" ..
-                 "Only applies to RADIUS mode.",
+              "Only applies to RADIUS mode.",
           order = 60,
           width = "normal",
-          min = 40, max = 200, step = 5,
+          min = 40,
+          max = 200,
+          step = 5,
           disabled = function()
             return CooldownCursor:GetDBValue("stackDirection") ~= "RADIUS"
           end,
@@ -812,18 +832,20 @@ local options = {
             CooldownCursor:SetDBNumber("radiusDistance", v)
           end,
         },
-        
+
         radiusStartAngle = {
           type = "range",
           name = "Starting Angle",
           desc = "Where the first icon appears in the circle:\n" ..
-                 "• 0° = Right\n" ..
-                 "• 90° = Bottom\n" ..
-                 "• 180° = Left\n" ..
-                 "• 270° = Top",
+              "• 0° = Right\n" ..
+              "• 90° = Bottom\n" ..
+              "• 180° = Left\n" ..
+              "• 270° = Top",
           order = 70,
           width = "normal",
-          min = 0, max = 359, step = 15,
+          min = 0,
+          max = 359,
+          step = 15,
           disabled = function()
             return CooldownCursor:GetDBValue("stackDirection") ~= "RADIUS"
           end,
@@ -834,19 +856,19 @@ local options = {
             CooldownCursor:SetDBNumber("radiusStartAngle", v)
           end,
         },
-        
+
         spacer4 = {
           type = "description",
           name = " ",
           order = 75,
         },
-        
+
         sortHeader = {
           type = "header",
           name = "Icon Sorting",
           order = 80,
         },
-        
+
         sortOrder = {
           type = "select",
           name = "Sort By",
@@ -866,7 +888,7 @@ local options = {
             CooldownCursor:SetDBString("sortOrder", v)
           end,
         },
-        
+
         sortDescription = {
           type = "description",
           name = function()
@@ -890,7 +912,7 @@ local options = {
         },
       },
     },
-    
+
     -- ========================================
     -- TEXT & NUMBERS TAB
     -- ========================================
@@ -899,13 +921,13 @@ local options = {
       name = "Text & Numbers",
       order = 300,
       args = {
-        
+
         spellNamesHeader = {
           type = "header",
           name = "Spell Names",
           order = 1,
         },
-        
+
         showSpellNames = {
           type = "toggle",
           name = "Show Spell Names",
@@ -921,12 +943,14 @@ local options = {
           name = "Font Size",
           order = 20,
           width = "normal",
-          min = 6, max = 32, step = 1,
+          min = 6,
+          max = 32,
+          step = 1,
           disabled = function() return not CooldownCursor:GetDBValue("showSpellNames") end,
           get = function() return CooldownCursor:GetDBValue("spellTextSize") end,
           set = function(_, v) CooldownCursor:SetDBNumber("spellTextSize", v) end,
         },
-        
+
         spellTextFont = {
           type = "select",
           name = "Font",
@@ -940,7 +964,7 @@ local options = {
           set = function(_, v) CooldownCursor:SetFontPath("spellTextFont", v) end,
         },
 
-         spellTextFontType = {
+        spellTextFontType = {
           type = "select",
           name = "Font Type",
           order = 35,
@@ -950,7 +974,7 @@ local options = {
             CooldownCursor:SetDBString("spellTextFontType", v)
           end,
         },
-        
+
         spellTextColor = {
           type = "color",
           name = "Color",
@@ -961,19 +985,19 @@ local options = {
           get = function() return HexColorGet("spellTextColor", "FFD100") end,
           set = function(_, r, g, b, a) HexColorSet("spellTextColor", r, g, b, a) end,
         },
-        
+
         spacer1 = {
           type = "description",
           name = " ",
           order = 45,
         },
-        
+
         cooldownNumbersHeader = {
           type = "header",
           name = "Cooldown Numbers",
           order = 50,
         },
-        
+
         cooldownNumbersNote = {
           type = "description",
           name = function()
@@ -984,7 +1008,7 @@ local options = {
           end,
           order = 55,
         },
-        
+
         hideCooldownNumbers = {
           type = "toggle",
           name = "Hide Cooldown Numbers",
@@ -1000,8 +1024,11 @@ local options = {
           name = "Font Size",
           order = 70,
           width = "normal",
-          min = 6, max = 48, step = 1,
-          disabled = function() return CooldownCursor:IsOmniCCLoaded() or CooldownCursor:GetDBValue("hideCooldownNumbers") end,
+          min = 6,
+          max = 48,
+          step = 1,
+          disabled = function() return CooldownCursor:IsOmniCCLoaded() or
+            CooldownCursor:GetDBValue("hideCooldownNumbers") end,
           get = function() return CooldownCursor:GetDBValue("cooldownTextSize") end,
           set = function(_, v) CooldownCursor:SetDBNumber("cooldownTextSize", v) end,
         },
@@ -1011,7 +1038,8 @@ local options = {
           name = "Font",
           order = 80,
           width = "normal",
-          disabled = function() return CooldownCursor:IsOmniCCLoaded() or CooldownCursor:GetDBValue("hideCooldownNumbers") end,
+          disabled = function() return CooldownCursor:IsOmniCCLoaded() or
+            CooldownCursor:GetDBValue("hideCooldownNumbers") end,
           values = FontValues,
           -- dialogControl = "LSM30_Font", TODO: https://github.com/SFX-WoW/AceGUI-3.0_SFX-Widgets/wiki/Installation
           -- values = AceGUIWidgetLSMlists.font,
@@ -1030,32 +1058,34 @@ local options = {
             CooldownCursor:SetDBString("cooldownTextFontType", v)
           end,
         },
-        
+
         cooldownTextColor = {
           type = "color",
           name = "Color",
           hasAlpha = false,
           order = 90,
           width = "normal",
-          disabled = function() return CooldownCursor:IsOmniCCLoaded() or CooldownCursor:GetDBValue("hideCooldownNumbers") end,
+          disabled = function() return CooldownCursor:IsOmniCCLoaded() or
+            CooldownCursor:GetDBValue("hideCooldownNumbers") end,
           get = function() return HexColorGet("cooldownTextColor", "FFFFFF") end,
           set = function(_, r, g, b, a) HexColorSet("cooldownTextColor", r, g, b, a) end,
         },
-        
+
         cooldownTextAnchor = {
           type = "select",
           name = "Position",
           desc = "Where to position the cooldown number on the icon.",
           order = 100,
           width = "normal",
-          disabled = function() return CooldownCursor:IsOmniCCLoaded() or CooldownCursor:GetDBValue("hideCooldownNumbers") end,
+          disabled = function() return CooldownCursor:IsOmniCCLoaded() or
+            CooldownCursor:GetDBValue("hideCooldownNumbers") end,
           values = AnchorValues,
           get = function() return CooldownCursor:GetDBValue("cooldownTextAnchor") end,
           set = function(_, v) CooldownCursor:SetDBString("cooldownTextAnchor", v) end,
         },
       },
     },
-    
+
     spellRulesGroup = {
       type = "group",
       name = "Spell Rules",
@@ -1129,7 +1159,7 @@ local options = {
             local id = tonumber(value)
             CooldownCursor._newRuleSpellID = id
           end,
-          },
+        },
 
         enabled = {
           type = "select",
@@ -1169,7 +1199,9 @@ local options = {
           type = "range",
           name = "Icon Size",
           order = 424,
-          min = 16, max = 128, step = 1,
+          min = 16,
+          max = 128,
+          step = 1,
           get = function()
             return CooldownCursor._newRuleIconSize or CooldownCursor:GetDBValue("iconSize")
           end,
@@ -1208,7 +1240,7 @@ local options = {
             })
 
             CooldownCursor._spellRuleStatusText =
-              ("Added: %s (%d)"):format(info.name, spellID)
+                ("Added: %s (%d)"):format(info.name, spellID)
             CooldownCursor._spellRuleStatusColor = "55ff55" -- green
 
             -- Reset inputs
@@ -1237,7 +1269,7 @@ local options = {
         },
       },
     },
-    
+
     -- ========================================
     -- ADVANCED TAB
     -- ========================================
@@ -1246,41 +1278,43 @@ local options = {
       name = "Advanced",
       order = 500,
       args = {
-        
+
         header = {
           type = "header",
           name = "Advanced Settings",
           order = 1,
         },
-        
+
         description = {
           type = "description",
           name = "|cffff8800Warning:|r These settings are for advanced users.\n" ..
-                 "Most users won't need to change these!",
+              "Most users won't need to change these!",
           order = 2,
         },
-        
+
         spacer1 = {
           type = "description",
           name = " ",
           order = 5,
         },
-        
+
         performanceHeader = {
           type = "header",
           name = "Performance",
           order = 10,
         },
-        
+
         iconPoolSize = {
           type = "range",
           name = "Icon Pool Size",
           desc = "Pre-creates this many icon frames for better performance.\n\n" ..
-                 "|cffff8800Requires /reload to take effect.|r\n\n" ..
-                 "Set higher than 'Maximum Icons' for best performance.",
+              "|cffff8800Requires /reload to take effect.|r\n\n" ..
+              "Set higher than 'Maximum Icons' for best performance.",
           order = 20,
           width = "normal",
-          min = 5, max = 20, step = 1,
+          min = 5,
+          max = 20,
+          step = 1,
           get = function()
             return CooldownCursor:GetDBValue("iconPoolSize")
           end,
@@ -1288,19 +1322,19 @@ local options = {
             CooldownCursor:SetDBNumber("iconPoolSize", v)
           end,
         },
-        
+
         spacer2 = {
           type = "description",
           name = " ",
           order = 35,
         },
-        
+
         resetHeader = {
           type = "header",
           name = "Reset",
           order = 50,
         },
-        
+
         reset = {
           type = "execute",
           name = "Reset All Settings",
@@ -1311,7 +1345,7 @@ local options = {
         },
       },
     },
-    
+
     -- ========================================
     -- ABOUT TAB
     -- ========================================
@@ -1325,7 +1359,7 @@ local options = {
           name = "CooldownCursor",
           order = 1,
         },
-        
+
         version = {
           type = "description",
           name = function()
@@ -1334,7 +1368,7 @@ local options = {
           fontSize = "medium",
           order = 10,
         },
-        
+
         author = {
           type = "description",
           name = function()
@@ -1343,7 +1377,7 @@ local options = {
           fontSize = "medium",
           order = 20,
         },
-        
+
         description = {
           type = "description",
           name = function()
@@ -1403,7 +1437,6 @@ function CooldownCursor:InitAce3Options()
 
   -- Tell AceConfig the table changed
   LibStub("AceConfigRegistry-3.0"):NotifyChange("CooldownCursor")
-
 end
 
 function CooldownCursor:NotifyOptionsChanged()

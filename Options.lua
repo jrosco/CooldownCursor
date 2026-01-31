@@ -769,7 +769,7 @@ local options = {
                  "Only applies to VERTICAL and HORIZONTAL modes.",
           order = 40,
           width = "normal",
-          min = 0, max = 20, step = 1,
+          min = -20, max = 20, step = 1,
           disabled = function()
             local dir = CooldownCursor:GetDBValue("stackDirection")
             return dir == "RADIUS" or dir == "SINGLE"

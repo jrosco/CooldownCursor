@@ -13,7 +13,14 @@ local hideTimer = nil
 local activeSpellID = nil
 local inCombat = false
 local fontsTable = {}
-local previewMouseMode = false
+local previewMouseMode = true
+local cachedCDSpells = {}
+
+-- Multi-icon state
+local iconPool = {}
+local activeIcons = {}
+local iconsByPriority = {}
+local nextIconID = 1
 
 local SHOW_WHEN_STATE = {
   ALWAYS = 0,
@@ -43,66 +50,20 @@ local FRAME_STRATA = {
 }
 
 local CD_TEXT_ANCHOR_POINTS = {
-  TOP = {
-    point = "TOP",
-    x = 0,
-    y = -4,
-  },
-  BOTTOM = {
-    point = "BOTTOM",
-    x = 0,
-    y = 4,
-  },
-  LEFT = {
-    point = "LEFT",
-    x = 4,
-    y = 0,
-  },
-  RIGHT = {
-    point = "RIGHT",
-    x = -4,
-    y = 0,
-  },
-  CENTER = {
-    point = "CENTER",
-    x = 0,
-    y = 0,
-  },
-  TOPLEFT = {
-    point = "TOPLEFT",
-    x = 4,
-    y = -4,
-  },
-  TOPRIGHT = {
-    point = "TOPRIGHT",
-    x = -4,
-    y = -4,
-  },
-  BOTTOMLEFT = {
-    point = "BOTTOMLEFT",
-    x = 4,
-    y = 4,
-  },
-  BOTTOMRIGHT = {
-    point = "BOTTOMRIGHT",
-    x = -4,
-    y = 4,
-  },
+  TOP = { point = "TOP", x = 0, y = -4 },
+  BOTTOM = { point = "BOTTOM", x = 0, y = 4 },
+  LEFT = { point = "LEFT", x = 4, y = 0 },
+  RIGHT = { point = "RIGHT", x = -4, y = 0 },
+  CENTER = { point = "CENTER", x = 0, y = 0 },
+  TOPLEFT = { point = "TOPLEFT", x = 4, y = -4 },
+  TOPRIGHT = { point = "TOPRIGHT", x = -4, y = -4 },
+  BOTTOMLEFT = { point = "BOTTOMLEFT", x = 4, y = 4 },
+  BOTTOMRIGHT = { point = "BOTTOMRIGHT", x = -4, y = 4 },
 }
 
 local SPELL_TEXT_ANCHOR_POINTS = {
-  BOTTOM = {
-    point = "TOP",
-    relativeTo = "BOTTOM",
-    x = 0,
-    y = -4,
-  },
-  TOP = {
-    point = "BOTTOM",
-    relativeTo = "TOP",
-    x = 0,
-    y = 4,
-  },
+  BOTTOM = { point = "TOP", relativeTo = "BOTTOM", x = 0, y = -4 },
+  TOP = { point = "BOTTOM", relativeTo = "TOP", x = 0, y = 4 },
 }
 
 local FONT_TYPES = {
@@ -114,16 +75,38 @@ local FONT_TYPES = {
   MONOCHROMETHICKOUTLINE = "MONOCHROMETHICKOUTLINE",
 }
 
--- Default WoW fonts with descriptive names
 local DEFAULT_SYSTEM_FONTS = {
-    ["Default"] = "Fonts\\FRIZQT__.TTF",
-    ["2002 Bold"] = "Fonts\\2002B.TTF",
-    ["2002"] = "Fonts\\2002.TTF",
-    ["Friz Quadrata TT"] = "Fonts\\FRIZQT__.TTF",
-    ["Arial Narrow"] = "Fonts\\ARIALN.TTF",
-    ["Skurri"] = "Fonts\\skurri.ttf",
-    ["Morpheus"] = "Fonts\\MORPHEUS.TTF",
-    ["Nimrod MT"] = "Fonts\\NIM_____.ttf",
+  ["Default"] = "Fonts\\FRIZQT__.TTF",
+  ["2002 Bold"] = "Fonts\\2002B.TTF",
+  ["2002"] = "Fonts\\2002.TTF",
+  ["Friz Quadrata TT"] = "Fonts\\FRIZQT__.TTF",
+  ["Arial Narrow"] = "Fonts\\ARIALN.TTF",
+  ["Skurri"] = "Fonts\\skurri.ttf",
+  ["Morpheus"] = "Fonts\\MORPHEUS.TTF",
+  ["Nimrod MT"] = "Fonts\\NIM_____.ttf",
+}
+
+-- Multi-icon constants
+local SORT_ORDER = {
+  ALPHABETICAL = "ALPHABETICAL",
+  PRIORITY = "PRIORITY",
+  TIME_ADDED = "TIME_ADDED",
+}
+
+local STACK_DIRECTION = {
+  SINGLE = "SINGLE",
+  VERTICAL = "VERTICAL",
+  HORIZONTAL = "HORIZONTAL",
+  RADIUS = "RADIUS",
+}
+
+local STACK_GROWTH = {
+  DOWN = "DOWN",
+  UP = "UP",
+  LEFT = "LEFT",
+  RIGHT = "RIGHT",
+  CLOCKWISE = "CLOCKWISE",
+  COUNTERCLOCKWISE = "COUNTERCLOCKWISE",
 }
 
 ----------------------------------------------------
@@ -137,15 +120,15 @@ local previewTicker = nil
 ----------------------------------------------------
 local spellRules = {
   settings = {
-    whitelist = true, -- if true, only enabled rules are allowed
-    disableRules = false, -- if true, all rules are ignored
+    whitelist = true,
+    disableRules = false,
   },
   rules = {}
 }
 
 local defaults = {
-  offsetX = 0, -- TODO: unused
-  offsetY = 0, -- TODO: unused
+  offsetX = 0,
+  offsetY = 0,
   scale = 1,
   iconSize = 48,
   iconAlpha = 100,
@@ -153,21 +136,19 @@ local defaults = {
   showSpellNames = false,
   hideCooldownNumbers = false,
   showCooldownSwipe = false,
-  hideAfter = 3,
+  hideAfter = 30,
   animation = false,
-  minDuration = 1.5, -- TODO: remove in midnight
-  maxDuration = 600, -- TODO: remove in midnight
   fadeOutDuration = 0,
-  showWhen = SHOW_WHEN_STATE.ALWAYS, -- 0=always, 1=in-combat, 2=out-of-combat
-  hideWhileMounted = false, -- hide when mounted
-  anchor = ANCHOR_POSITION.TOPLEFT,
-  anchorPadding = 2, -- distance from cursor
+  showWhen = SHOW_WHEN_STATE.COMBAT,
+  hideWhileMounted = false,
+  anchor = ANCHOR_POSITION.TOPRIGHT,
+  anchorPadding = 2,
   spellTextFont = "Friz Quadrata TT",
   spellTextFontPath = DEFAULT_SYSTEM_FONTS["Friz Quadrata TT"],
   spellTextSize = 14,
   spellTextFontType = FONT_TYPES.OUTLINE,
   spellTextColor = "#FFD100",
-  spellTextAnchor = "TOP", -- or BOTTOM
+  spellTextAnchor = "TOP",
   spellTextAlpha = 100,
   cooldownTextSize = 20,
   cooldownTextFont = "Friz Quadrata TT",
@@ -178,6 +159,16 @@ local defaults = {
   cooldownTextAlpha = 100,
   frameStrata = FRAME_STRATA.HIGH,
   spellRules = spellRules,
+
+  -- Multiple Icon Display Settings
+  maxIcons = 5,
+  stackDirection = STACK_DIRECTION.HORIZONTAL,
+  stackSpacing = 4,
+  sortOrder = SORT_ORDER.PRIORITY,
+  stackGrowth = STACK_GROWTH.RIGHT,
+  iconPoolSize = 10,
+  radiusDistance = 80,
+  radiusStartAngle = 0,
 }
 
 function CooldownCursor:ApplyDefaults()
@@ -189,76 +180,176 @@ function CooldownCursor:ApplyDefaults()
   end
 end
 
-----------------------------------------------------
--- Icon frame initialization
-----------------------------------------------------
-local icon = CreateFrame("Frame", "CooldownCursorIcon", UIParent)
-icon:EnableMouse(false)
-icon:SetSize(defaults.iconSize, defaults.iconSize)
-icon:SetFrameStrata(defaults.frameStrata)
-icon:Hide()
+function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
+  -- Use it to:
+  -- 1. Apply any breaking changes to CooldownCursorDB (migrations)
+  -- 2. Set release notes for display in Options UI
 
-icon.icon = icon:CreateTexture(nil, "BACKGROUND")
-icon.icon:SetAllPoints()
+   -- Initialize version if missing
+  if not CooldownCursorDB._version then
+    CooldownCursorDB._version = 0
+  end
 
-icon.cooldown = CreateFrame("Cooldown", nil, icon, "CooldownFrameTemplate")
-icon.cooldown:SetAllPoints(icon)
-icon.cooldown:SetDrawEdge(false)
+  -- ========================================
+  -- BREAKING CHANGES (Migrations)
+  -- ========================================
+  -- Put code here that changes CooldownCursorDB values
+  -- This runs every time, so use conditional checks
 
--- Cache the cooldown text region for later use
-local cooldownRegion = icon.cooldown:GetRegions()
-if cooldownRegion and cooldownRegion:IsObjectType("FontString") then
-  icon.cooldownText = cooldownRegion
+  local breakingChanges = {}
+  local newFeatures = {}
+  local fixes = {}
+  local major = tonumber(self:GetMajorVersion())
+
+  ----------------------------------------------------------------------------------
+  -- migration from version 1 to 2 -------------------------------------------------
+  if CooldownCursorDB._version < 2 then
+
+    -- Run breaking changes here
+    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.ALWAYS then
+      CooldownCursorDB.showWhen = SHOW_WHEN_STATE.COMBAT
+    end
+
+    if CooldownCursorDB.anchor ~= ANCHOR_POSITION.TOPRIGHT then
+      CooldownCursorDB.anchor = ANCHOR_POSITION.TOPRIGHT
+    end
+  end
+  ----------------------------------------------------------------------------------
+  ----------------------------------------------------------------------------------
+
+  CooldownCursorDB._version = major
+
+  -- ========================================
+  -- RELEASE NOTES (Display Only)
+  -- ========================================
+  -- These are just for showing users what changed
+  -- No code execution, just messages
+
+  -- breaking changes
+  table.insert(breakingChanges, "Changed 'Show When' default from 'Always' to 'In Combat'")
+  table.insert(breakingChanges, "Changed 'Anchor' default to 'Top Right'")
+  table.insert(breakingChanges, "NOTE: This release is in Beta and may contain bugs. Please report any issues on the CurseForge page.")
+  -- new features
+  table.insert(newFeatures, "Added RADIUS, HORIZONTAL and VERTICAL display modes for multi-icon stacking")
+  table.insert(newFeatures, "Added HORIZONTAL and VERTICAL stack directions")
+  -- fixes
+  table.insert(fixes, "Fixed SPELL_UPDATE_COOLDOWN not triggering spells with CD Buff updates")
+
+  -- Store for Options.lua to display
+  self.releaseNotes = {
+    breakingChanges = breakingChanges,
+    newFeatures = newFeatures,
+    fixes = fixes,
+  }
 end
 
-icon.text = icon:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-icon.text:SetPoint("BOTTOM", icon, "TOP", 0, 4)
-icon.text:Hide()
+----------------------------------------------------
+-- Icon frame creation
+----------------------------------------------------
+local function CreateIconFrame(index)
+  local iconFrame = CreateFrame("Frame", "CooldownCursorIcon" .. index, UIParent)
+  iconFrame:EnableMouse(false)
+  iconFrame:SetSize(defaults.iconSize, defaults.iconSize)
+  iconFrame:SetFrameStrata(defaults.frameStrata)
+  iconFrame:Hide()
+  
+  iconFrame.icon = iconFrame:CreateTexture(nil, "BACKGROUND")
+  iconFrame.icon:SetAllPoints()
+  
+  iconFrame.cooldown = CreateFrame("Cooldown", nil, iconFrame, "CooldownFrameTemplate")
+  iconFrame.cooldown:SetAllPoints(iconFrame)
+  iconFrame.cooldown:SetDrawEdge(false)
+  
+  local cooldownRegion = iconFrame.cooldown:GetRegions()
+  if cooldownRegion and cooldownRegion:IsObjectType("FontString") then
+    iconFrame.cooldownText = cooldownRegion
+  end
+  
+  iconFrame.text = iconFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  iconFrame.text:SetPoint("BOTTOM", iconFrame, "TOP", 0, 4)
+  iconFrame.text:Hide()
+  
+  iconFrame.showAnim = iconFrame:CreateAnimationGroup()
+  local scaleUp = iconFrame.showAnim:CreateAnimation("Scale")
+  scaleUp:SetOrder(1)
+  scaleUp:SetScale(1.15, 1.15)
+  scaleUp:SetDuration(0.08)
+  local scaleDown = iconFrame.showAnim:CreateAnimation("Scale")
+  scaleDown:SetOrder(2)
+  scaleDown:SetScale(1 / 1.15, 1 / 1.15)
+  scaleDown:SetDuration(0.08)
+  
+  iconFrame.fadeOut = iconFrame:CreateAnimationGroup()
+  local fadeOut = iconFrame.fadeOut:CreateAnimation("Alpha")
+  fadeOut:SetFromAlpha(1)
+  fadeOut:SetToAlpha(0)
+  fadeOut:SetDuration(defaults.fadeOutDuration or 0)
+  fadeOut:SetSmoothing("OUT")
+  
+  iconFrame.fadeOut:SetScript("OnFinished", function()
+    iconFrame:SetScript("OnUpdate", nil)
+    iconFrame.cooldown:Clear()
+    iconFrame.text:Hide()
+    iconFrame:Hide()
+    iconFrame.icon:SetAlpha(1)
+    ReturnIconToPool(iconFrame)
+  end)
+  
+  iconFrame.iconID = index
+  iconFrame.spellID = nil
+  iconFrame.addedTime = nil
+  iconFrame.priority = 0
+  iconFrame.hideTimer = nil
+  iconFrame.stackOffsetX = 0
+  iconFrame.stackOffsetY = 0
+  
+  return iconFrame
+end
 
 ----------------------------------------------------
--- Show animation initialization
+-- Icon Pool Management
 ----------------------------------------------------
-icon.showAnim = icon:CreateAnimationGroup()
+local function InitializeIconPool()
+  local poolSize = CooldownCursorDB.iconPoolSize or defaults.iconPoolSize
+  for i = 1, poolSize do
+    local iconFrame = CreateIconFrame(i)
+    table.insert(iconPool, iconFrame)
+  end
+end
 
-local scaleUp = icon.showAnim:CreateAnimation("Scale")
-scaleUp:SetOrder(1)
-scaleUp:SetScale(1.15, 1.15)
-scaleUp:SetDuration(0.08)
+local function GetIconFromPool()
+  if #iconPool > 0 then
+    return table.remove(iconPool, 1)
+  end
+  local newIcon = CreateIconFrame(nextIconID)
+  nextIconID = nextIconID + 1
+  return newIcon
+end
 
-local scaleDown = icon.showAnim:CreateAnimation("Scale")
-scaleDown:SetOrder(2)
-scaleDown:SetScale(1 / 1.15, 1 / 1.15)
-scaleDown:SetDuration(0.08)
+function ReturnIconToPool(iconFrame)
+  if not iconFrame then return end
+  
+  iconFrame:Hide()
+  iconFrame:SetScript("OnUpdate", nil)
+  iconFrame.spellID = nil
+  iconFrame.addedTime = nil
+  iconFrame.priority = 0
+  iconFrame.stackOffsetX = 0
+  iconFrame.stackOffsetY = 0
+  
+  if iconFrame.hideTimer then
+    iconFrame.hideTimer:Cancel()
+    iconFrame.hideTimer = nil
+  end
+  
+  table.insert(iconPool, iconFrame)
+end
 
 ----------------------------------------------------
--- Fade out icon animation initialization
-----------------------------------------------------
-icon.fadeOut = icon:CreateAnimationGroup()
-local fadeOut = icon.fadeOut:CreateAnimation("Alpha")
-fadeOut:SetFromAlpha(1)
-fadeOut:SetToAlpha(0)
-fadeOut:SetDuration(defaults.fadeOutDuration or 0)
-fadeOut:SetSmoothing("OUT")
-
-icon.fadeOut:SetScript("OnFinished", function()
-  icon:SetScript("OnUpdate", nil)
-  icon.cooldown:Clear()
-  icon.text:Hide()
-  icon:Hide()
-  icon.icon:SetAlpha(1) -- reset for next show
-end)
-
-----------------------------------------------------
--- Masque support initialization
+-- Masque support
 ----------------------------------------------------
 local Masque = LibStub and LibStub("Masque", true)
 local MasqueGroup = Masque and Masque:Group(addonName)
-if MasqueGroup then
-  MasqueGroup:AddButton(icon, {
-    Icon = icon.icon,
-    Cooldown = icon.cooldown,
-  })
-end
 
 ----------------------------------------------------
 -- OmniCC support check
@@ -332,11 +423,10 @@ end
 --- Get available fonts helper
 ----------------------------------------------------
 local function FontNames()
-  -- Return cached list if already built
   if #fontsTable > 0 then
     return fontsTable
   end
-  -- Build font list
+  
   if LSM then
     for _, fontName in pairs(LSM:List("font")) do
       local path = LSM:Fetch("font", fontName)
@@ -357,15 +447,10 @@ end
 --------------------------------------------------
 local function HexToRGB(hex)
   hex = hex:gsub("#", "")
-
-  if #hex ~= 6 then
-    return 1, 1, 1
-  end
-
+  if #hex ~= 6 then return 1, 1, 1 end
   local r = tonumber(hex:sub(1, 2), 16) / 255
   local g = tonumber(hex:sub(3, 4), 16) / 255
   local b = tonumber(hex:sub(5, 6), 16) / 255
-
   return r, g, b
 end
 
@@ -375,14 +460,10 @@ end
 local function PercentToAlpha(percent)
   local alpha = tonumber(percent)
   if not alpha then return end
-
-  -- Accept 0–100 and convert to 0–1
   if alpha > 1 then
     alpha = math.max(0, math.min(100, alpha)) / 100
   end
-
   return alpha
-
 end
 
 --------------------------------------------------
@@ -401,14 +482,66 @@ end
 --------------------------------------------------
 local function ApplyFonts(obj, path, size, flags)
   if flags == "NONE" or flags == "" then
-    -- nil fonts flags are allowed and valid with obj:SetFont()
     flags = nil
   end
-
   local applied = obj:SetFont(path, size, flags)
   if not applied then
-    -- Hard fallback
     obj:SetFont("Fonts\\FRIZQT__.TTF", size, nil)
+  end
+end
+
+----------------------------------------------------
+-- Multi-Icon Stack Offset Calculation
+----------------------------------------------------
+local function GetStackOffset(index, totalIcons)
+  local iconSize = CooldownCursorDB.iconSize or defaults.iconSize
+  local spacing = CooldownCursorDB.stackSpacing or defaults.stackSpacing
+  local direction = CooldownCursorDB.stackDirection or STACK_DIRECTION.VERTICAL
+  local growth = CooldownCursorDB.stackGrowth or STACK_GROWTH.DOWN
+  
+  -- For Radius layout
+  if direction == STACK_DIRECTION.RADIUS then
+    local radius = CooldownCursorDB.radiusDistance or defaults.radiusDistance
+    local startAngle = CooldownCursorDB.radiusStartAngle or defaults.radiusStartAngle
+    
+    -- Calculate angle for this icon
+    local angleStep = 360 / math.max(1, totalIcons)
+    local angle = startAngle + (angleStep * index)
+    
+    -- Reverse direction for counterclockwise
+    if growth == STACK_GROWTH.COUNTERCLOCKWISE then
+      angle = startAngle - (angleStep * index)
+    end
+    
+    -- Convert to radians
+    local rad = math.rad(angle)
+    
+    -- Calculate position on circle
+    local offsetX = math.cos(rad) * radius
+    local offsetY = -math.sin(rad) * radius  -- Negative because Y increases downward in WoW
+    
+    return offsetX, offsetY
+  end
+  
+  -- For Vertical/Horizontal layouts - only apply offset if index > 0
+  if index == 0 then
+    return 0, 0  -- First icon at cursor position
+  end
+  
+  local offset = (iconSize + spacing) * index
+  
+  if direction == STACK_DIRECTION.VERTICAL then
+    if growth == STACK_GROWTH.DOWN then
+      return 0, -offset
+    else -- UP
+      return 0, offset
+    end
+  else -- HORIZONTAL
+    if growth == STACK_GROWTH.RIGHT then
+      return offset, 0
+    else -- LEFT
+      return -offset, 0
+    end
   end
 end
 
@@ -416,34 +549,39 @@ end
 -- Cursor tracking and positioning
 ----------------------------------------------------
 local function UpdateCooldownIconFrame(self)
-  local uiScale  = UIParent:GetEffectiveScale()
+  local uiScale = UIParent:GetEffectiveScale()
   local cursorX, cursorY = GetCursorPosition()
 
+  -- Convert cursor position to UI coordinates
   local x = cursorX / uiScale
   local y = cursorY / uiScale
 
   local size = CooldownCursorDB.iconSize or defaults.iconSize
-  local pad  = CooldownCursorDB.anchorPadding or defaults.anchorPadding
+  local pad = CooldownCursorDB.anchorPadding or defaults.anchorPadding
   local anchor = CooldownCursorDB.anchor or defaults.anchor
 
   local screenW = UIParent:GetWidth()
   local screenH = UIParent:GetHeight()
   local half = size / 2
 
-  -- Calculate desired offsets
+  -- Get base offset from anchor
   local ox, oy = AnchorOffsets(anchor, size, pad)
+  
+  -- Add stack offset (this positions icons relative to each other)
+  ox = ox + (self.stackOffsetX or 0)
+  oy = oy + (self.stackOffsetY or 0)
+  
   local targetX = x + ox
   local targetY = y + oy
 
   -- Check if it would go off-screen
-  local offLeft   = (targetX - half) < 0
-  local offRight  = (targetX + half) > screenW
+  local offLeft = (targetX - half) < 0
+  local offRight = (targetX + half) > screenW
   local offBottom = (targetY - half) < 0
-  local offTop    = (targetY + half) > screenH
+  local offTop = (targetY + half) > screenH
 
   -- Flip anchor if needed
   local flipped = anchor
-
   if offLeft or offRight then
     flipped = FlipAnchorX(flipped)
   end
@@ -451,37 +589,52 @@ local function UpdateCooldownIconFrame(self)
     flipped = FlipAnchorY(flipped)
   end
 
-  -- Recompute offsets after flipping
-  ox, oy = AnchorOffsets(flipped, size, pad)
+  -- Recalculate if flipped
+  if flipped ~= anchor then
+    ox, oy = AnchorOffsets(flipped, size, pad)
+    ox = ox + (self.stackOffsetX or 0)
+    oy = oy + (self.stackOffsetY or 0)
+    targetX = x + ox
+    targetY = y + oy
+  end
 
+  -- Set position directly
   self:ClearAllPoints()
-  self:SetPoint("CENTER", UIParent, "BOTTOMLEFT",
-    x + ox * (CooldownCursorDB.scale or defaults.scale),
-    y + oy * (CooldownCursorDB.scale or defaults.scale))
+  self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", targetX, targetY)
 end
 
 ----------------------------------------------------
 -- Apply settings and refresh active display
 ----------------------------------------------------
 function CooldownCursor:UpdateDisplay(spellID)
+  if self:IsMultiIconEnabled() then
+    for _, iconData in ipairs(iconsByPriority) do
+      self:UpdateSingleIcon(iconData.iconFrame, iconData.spellID)
+    end
+    UpdateIconPositions()
+  else
+    if #iconsByPriority > 0 then
+      local firstIcon = iconsByPriority[1].iconFrame
+      firstIcon.stackOffsetX = 0
+      firstIcon.stackOffsetY = 0
+      self:UpdateSingleIcon(firstIcon, iconsByPriority[1].spellID)
+    end
+  end
+end
 
-  -- Show/hide icon
+function CooldownCursor:UpdateSingleIcon(icon, spellID)
+  if not icon then return end
+  
   icon.icon:SetShown(not CooldownCursorDB.iconHide)
+  icon.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
 
-  icon.icon:SetAlpha(
-    PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
-  )
-
-  -- Set frame strata
   icon:SetFrameStrata(
     FRAME_STRATA[string.upper(CooldownCursorDB.frameStrata)] or
     FRAME_STRATA[string.upper(defaults.frameStrata)]
   )
 
-  -- Check for OmniCC presence
   local omniCC = self:IsOmniCCLoaded()
   if icon.cooldownText and not omniCC then
-    -- Set Cooldown text font and color
     ApplyFonts(
       icon.cooldownText,
       CooldownCursorDB.cooldownTextFontPath or defaults.cooldownTextFontPath,
@@ -489,28 +642,17 @@ function CooldownCursor:UpdateDisplay(spellID)
       CooldownCursorDB.cooldownTextFontType or defaults.cooldownTextFontType
     )
 
-    local cdr, cdg, cdb = HexToRGB(
-    CooldownCursorDB.cooldownTextColor or defaults.cooldownTextColor)
-    local cdAlpha = PercentToAlpha(CooldownCursorDB.cooldownTextAlpha or
-      defaults.cooldownTextAlpha)
+    local cdr, cdg, cdb = HexToRGB(CooldownCursorDB.cooldownTextColor or defaults.cooldownTextColor)
+    local cdAlpha = PercentToAlpha(CooldownCursorDB.cooldownTextAlpha or defaults.cooldownTextAlpha)
     icon.cooldownText:SetTextColor(cdr, cdg, cdb, cdAlpha)
 
-    -- Set Cooldown Text anchor position
-    local anchorPoint =
-      CD_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.cooldownTextAnchor)]
+    local anchorPoint = CD_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.cooldownTextAnchor)]
         or CD_TEXT_ANCHOR_POINTS[string.upper(defaults.cooldownTextAnchor)]
     icon.cooldownText:ClearAllPoints()
-    icon.cooldownText:SetPoint(
-      anchorPoint.point,
-      icon,
-      anchorPoint.point,
-      anchorPoint.x,
-      anchorPoint.y
-    )
+    icon.cooldownText:SetPoint(anchorPoint.point, icon, anchorPoint.point, anchorPoint.x, anchorPoint.y)
   end
 
   if icon.text then
-    -- Set Spell Text font and color
     ApplyFonts(
       icon.text,
       CooldownCursorDB.spellTextFontPath or defaults.spellTextFontPath,
@@ -518,50 +660,28 @@ function CooldownCursor:UpdateDisplay(spellID)
       CooldownCursorDB.spellTextFontType or defaults.spellTextFontType
     )
 
-    local textr, textg, textb = HexToRGB(
-      CooldownCursorDB.spellTextColor or defaults.spellTextColor)
-    local textAlpha = PercentToAlpha(CooldownCursorDB.spellTextAlpha or
-      defaults.spellTextAlpha)
+    local textr, textg, textb = HexToRGB(CooldownCursorDB.spellTextColor or defaults.spellTextColor)
+    local textAlpha = PercentToAlpha(CooldownCursorDB.spellTextAlpha or defaults.spellTextAlpha)
     icon.text:SetTextColor(textr, textg, textb, textAlpha)
   end
 
-  -- Set Spell Text anchor position
-  local anchorPoint =
-    SPELL_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.spellTextAnchor)]
+  local anchorPoint = SPELL_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.spellTextAnchor)]
       or SPELL_TEXT_ANCHOR_POINTS[string.upper(defaults.spellTextAnchor)]
   icon.text:ClearAllPoints()
-  icon.text:SetPoint(
-    anchorPoint.point,
-    icon,
-    anchorPoint.relativeTo,
-    anchorPoint.x,
-    anchorPoint.y
-  )
+  icon.text:SetPoint(anchorPoint.point, icon, anchorPoint.relativeTo, anchorPoint.x, anchorPoint.y)
 
-  -- Set icon size and scale
-  -- Don't scale with icon.icon:SetScale() as it messes with cursor position calculations
   local size = CooldownCursor:GetEffectiveIconSize(spellID)
-  icon:SetSize(size * (CooldownCursorDB.scale or defaults.scale),
-    size * (CooldownCursorDB.scale or defaults.scale))
+  local scale = CooldownCursorDB.scale or defaults.scale
+  icon:SetSize(size * scale, size * scale)
+  icon.text:SetScale(scale)
+  icon.cooldown:SetScale(scale)
 
-  -- Set all other scale settings
-  icon.text:SetScale(CooldownCursorDB.scale or defaults.scale)
-  icon.cooldown:SetScale(CooldownCursorDB.scale or defaults.scale)
+  icon.cooldown:SetHideCountdownNumbers(CooldownCursorDB.hideCooldownNumbers)
+  icon.cooldown:SetDrawSwipe(CooldownCursorDB.showCooldownSwipe)
 
-  -- Hide countdown numbers when enabled
-  icon.cooldown:SetHideCountdownNumbers(
-    CooldownCursorDB.hideCooldownNumbers
-  )
-
-  -- Show/hide cooldown swipe
-  icon.cooldown:SetDrawSwipe(
-    CooldownCursorDB.showCooldownSwipe
-  )
-
-  -- Refresh active live spell name
-  if icon:IsShown() and activeSpellID then
-    local info = C_Spell.GetSpellInfo(activeSpellID)
-    if CooldownCursorDB.showSpellNames and info.name then
+  if icon:IsShown() and icon.spellID then
+    local info = C_Spell.GetSpellInfo(icon.spellID)
+    if info and CooldownCursorDB.showSpellNames and info.name then
       icon.text:SetText(info.name)
       icon.text:Show()
     else
@@ -569,8 +689,7 @@ function CooldownCursor:UpdateDisplay(spellID)
     end
   end
 
-  -- Masque re-skin icon changes
-  if MasqueGroup then
+  if MasqueGroup and icon.iconID == 1 then
     MasqueGroup:ReSkin()
     if CooldownCursorDB.iconHide then
       icon.icon:SetAlpha(0)
@@ -579,13 +698,127 @@ function CooldownCursor:UpdateDisplay(spellID)
 end
 
 ----------------------------------------------------
+-- Icon Sorting Functions
+----------------------------------------------------
+local function SortIconsByTimeAdded(a, b)
+  return a.addedTime < b.addedTime
+end
+local function SortIconsAlphabetically(a, b)
+  return (a.spellName or ""):lower() < (b.spellName or ""):lower()
+end
+
+local function SortIconsByPriority(a, b)
+  if a.priority ~= b.priority then
+    return a.priority > b.priority
+  end
+  return SortIconsByTimeAdded(a, b)
+end
+
+local function SortIcons()
+  local sortOrder = CooldownCursorDB.sortOrder or SORT_ORDER.PRIORITY
+
+  if sortOrder == SORT_ORDER.ALPHABETICAL then
+    table.sort(iconsByPriority, SortIconsAlphabetically)
+  elseif sortOrder == SORT_ORDER.PRIORITY then
+    table.sort(iconsByPriority, SortIconsByPriority)
+  elseif sortOrder == SORT_ORDER.TIME_ADDED then
+    table.sort(iconsByPriority, SortIconsByTimeAdded)
+  else
+    -- Fallback to PRIORITY if invalid sort order
+    table.sort(iconsByPriority, SortIconsByPriority)
+  end
+end
+
+----------------------------------------------------
+-- Update Icon Positions
+----------------------------------------------------
+function UpdateIconPositions()
+  local totalIcons = #iconsByPriority
+  
+  for i, iconData in ipairs(iconsByPriority) do
+    local iconFrame = iconData.iconFrame
+    if iconFrame then
+      local offsetX, offsetY = GetStackOffset(i - 1, totalIcons)
+      iconFrame.stackOffsetX = offsetX
+      iconFrame.stackOffsetY = offsetY
+    end
+  end
+end
+
+----------------------------------------------------
+-- Remove Icon for Spell
+----------------------------------------------------
+local function RemoveIconForSpell(spellID, immediate)
+  local iconData = activeIcons[spellID]
+  if not iconData then return end
+
+  activeIcons[spellID] = nil
+
+  for i, data in ipairs(iconsByPriority) do
+    if data.spellID == spellID then
+      table.remove(iconsByPriority, i)
+      break
+    end
+  end
+
+  local iconFrame = iconData.iconFrame
+
+  if iconFrame.hideTimer then
+    iconFrame.hideTimer:Cancel()
+    iconFrame.hideTimer = nil
+  end
+
+  if immediate or CooldownCursorDB.fadeOutDuration == 0 then
+    ReturnIconToPool(iconFrame)
+  else
+    iconFrame.fadeOut:Stop()
+    local fadeOutAnim = iconFrame.fadeOut:GetAnimations()
+    fadeOutAnim:SetDuration(CooldownCursorDB.fadeOutDuration or 0.3)
+    iconFrame.fadeOut:Play()
+  end
+
+  SortIcons()
+  UpdateIconPositions()
+end
+
+----------------------------------------------------
+-- Schedule Hide Timer for Icon
+----------------------------------------------------
+local function ScheduleHideTimerForIcon(iconFrame, spellID)
+  -- Don't schedule hide timer during preview mode
+  if previewActive then
+    return
+  end
+
+  if iconFrame.hideTimer then
+    iconFrame.hideTimer:Cancel()
+  end
+
+  local hideAfter = CooldownCursorDB.hideAfter or defaults.hideAfter
+
+  iconFrame.hideTimer = C_Timer.NewTimer(hideAfter, function()
+    RemoveIconForSpell(spellID, false)
+  end)
+end
+
+----------------------------------------------------
+-- Enforce Max Icons
+----------------------------------------------------
+local function EnforceMaxIcons()
+  local maxIcons = CooldownCursorDB.maxIcons or defaults.maxIcons
+  
+  while #iconsByPriority > maxIcons do
+    local toRemove = iconsByPriority[#iconsByPriority]
+    RemoveIconForSpell(toRemove.spellID, true)
+  end
+end
+
+----------------------------------------------------
 -- Spell Rule Logic
 ----------------------------------------------------
 function CooldownCursor:GetSpellRule(spellID)
   local data = CooldownCursorDB.spellRules
-
   if not data or not data.rules then return true end
-
   if data.settings.disableRules then return true end
 
   local rules = data.rules
@@ -593,17 +826,206 @@ function CooldownCursor:GetSpellRule(spellID)
 
   local rule = rules[spellID]
 
-  -- Whitelist mode
   if data.settings.whitelist then
     return rule and rule.enabled ~= false, rule
   end
 
-  -- Blacklist mode
   if rule and rule.enabled == false then
     return false
   end
 
   return true, rule
+end
+
+----------------------------------------------------
+-- Show icon + cooldown
+----------------------------------------------------
+local function ShowSpellIcon(spellID, durationObject)
+  local spellInfo = C_Spell.GetSpellInfo(spellID)
+  if not spellInfo or not spellInfo.iconID then return end
+  -- Check if SINGLE mode (override behavior)
+  local stackDirection = CooldownCursorDB.stackDirection or defaults.stackDirection
+  local isSingleMode = (stackDirection == STACK_DIRECTION.SINGLE)
+
+  if isSingleMode then
+    -- SINGLE mode: Always override with newest spell
+    -- Hide any existing icons
+    if #iconsByPriority > 0 then
+      for i = #iconsByPriority, 1, -1 do
+        RemoveIconForSpell(iconsByPriority[i].spellID, true)
+      end
+    end
+    
+    -- Show the new spell
+    local iconFrame = GetIconFromPool()
+    if not iconFrame then return end
+    
+    local show, rule = CooldownCursor:GetSpellRule(spellID)
+    local priority = (rule and rule.priority) or 0
+    
+    local iconData = {
+      spellID = spellID,
+      iconFrame = iconFrame,
+      durationObject = durationObject,
+      spellName = spellInfo.name,
+      addedTime = GetTime(),
+      priority = priority,
+    }
+    
+    activeIcons[spellID] = iconData
+    table.insert(iconsByPriority, iconData)
+    
+    iconFrame.spellID = spellID
+    iconFrame.addedTime = iconData.addedTime
+    iconFrame.priority = priority
+    
+    CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
+    
+    iconFrame.icon:SetTexture(spellInfo.iconID)
+    iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
+    
+    if CooldownCursorDB.showSpellNames and spellInfo.name then
+      iconFrame.text:SetText(spellInfo.name)
+      iconFrame.text:Show()
+    else
+      iconFrame.text:Hide()
+    end
+    
+    if CooldownCursorDB.animation then
+      iconFrame:SetScale(1)
+      iconFrame.showAnim:Stop()
+      iconFrame.showAnim:Play()
+    end
+    
+    iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha))
+    iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
+    iconFrame:Show()
+    
+    ScheduleHideTimerForIcon(iconFrame, spellID)
+    return
+  end
+
+
+  if CooldownCursor:IsMultiIconEnabled() then
+    -- If spell already exists, update it instead of creating duplicate
+    local existingIcon = activeIcons[spellID]
+    if existingIcon then
+      local iconFrame = existingIcon.iconFrame
+      iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
+      existingIcon.durationObject = durationObject
+      ScheduleHideTimerForIcon(iconFrame, spellID)
+      SortIcons()
+      UpdateIconPositions()
+      return
+    end
+
+    -- Get icon from pool
+    local iconFrame = GetIconFromPool()
+    if not iconFrame then return end
+
+    local show, rule = CooldownCursor:GetSpellRule(spellID)
+    local priority = (rule and rule.priority) or 0
+
+    local iconData = {
+      spellID = spellID,
+      iconFrame = iconFrame,
+      durationObject = durationObject,
+      spellName = spellInfo.name,
+      addedTime = GetTime(),
+      priority = priority,
+    }
+
+    -- Register in both tracking tables
+    activeIcons[spellID] = iconData
+    table.insert(iconsByPriority, iconData)
+
+    iconFrame.spellID = spellID
+    iconFrame.addedTime = iconData.addedTime
+    iconFrame.priority = priority
+
+    CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
+
+    iconFrame.icon:SetTexture(spellInfo.iconID)
+    iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
+
+    if CooldownCursorDB.showSpellNames and spellInfo.name then
+      iconFrame.text:SetText(spellInfo.name)
+      iconFrame.text:Show()
+    else
+      iconFrame.text:Hide()
+    end
+
+    if CooldownCursorDB.animation then
+      iconFrame:SetScale(1)
+      iconFrame.showAnim:Stop()
+      iconFrame.showAnim:Play()
+    end
+
+    iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha))
+    iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
+    iconFrame:Show()
+
+    SortIcons()
+    UpdateIconPositions()
+    EnforceMaxIcons()
+    ScheduleHideTimerForIcon(iconFrame, spellID)
+
+  else
+    -- Single icon mode
+    if lastSpellId and lastSpellId ~= spellID then
+      CooldownCursor:HideIconNow()
+    end
+
+    lastSpellId = spellID
+    activeSpellID = spellID
+
+    local iconFrame
+    local existingData = activeIcons[spellID]
+
+    if existingData then
+      iconFrame = existingData.iconFrame
+    else
+      iconFrame = GetIconFromPool()
+      if not iconFrame then return end
+
+      local iconData = {
+        spellID = spellID,
+        iconFrame = iconFrame,
+        durationObject = durationObject,
+        spellName = spellInfo.name,
+        addedTime = GetTime(),
+        priority = 0,
+      }
+      activeIcons[spellID] = iconData
+      table.insert(iconsByPriority, iconData)
+    end
+
+    iconFrame.spellID = spellID
+    CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
+
+    if CooldownCursorDB.animation then
+      iconFrame:SetScale(1)
+      iconFrame.showAnim:Stop()
+      iconFrame.showAnim:Play()
+    end
+
+    iconFrame.icon:SetTexture(spellInfo.iconID)
+    iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
+
+    if CooldownCursorDB.showSpellNames and spellInfo.name then
+      iconFrame.text:SetText(spellInfo.name)
+      iconFrame.text:Show()
+    else
+      iconFrame.text:Hide()
+    end
+
+    iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
+    iconFrame.fadeOut:Stop()
+    iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha))
+    iconFrame:Show()
+
+    ScheduleHideTimerForIcon(iconFrame, spellID)
+  end
 end
 
 ----------------------------------------------------
@@ -616,53 +1038,18 @@ function CooldownCursor:HideIconNow()
   end
   previewActive = false
 
-  if CooldownCursorDB.fadeOutDuration == 0 then
-    icon:SetScript("OnUpdate", nil)
-    icon.cooldown:Clear()
-    icon.text:Hide()
-  end
-
-  lastSpellId = nil
-  if hideTimer then
-    hideTimer:Cancel()
-    hideTimer = nil
-  end
-  activeSpellID = nil
-  if CooldownCursorDB.fadeOutDuration == 0 then
-    icon:Hide()
-    icon.icon:SetAlpha(
-      PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
-    )
+  if self:IsMultiIconEnabled() then
+    self:HideAllIcons(true)
   else
-    icon.fadeOut:Stop()
-    fadeOut:SetDuration(tonumber(CooldownCursorDB.fadeOutDuration) or 0)
-    icon.icon:SetAlpha(
-      PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
-    )
-    icon.fadeOut:Play()
-  end
-
-end
-
-----------------------------------------------------
--- Scheduled Hide timer
-----------------------------------------------------
-local function ScheduleHideTimer()
-  if not activeSpellID then return end
-
-  if hideTimer then
-    hideTimer:Cancel()
-    hideTimer = nil
-  end
-
-  -- Use fixed hideAfter duration (Midnight-safe)
-  local hideDelay = CooldownCursorDB.hideAfter or defaults.hideAfter
-
-  hideTimer = C_Timer.NewTimer(hideDelay, function()
-    if lastSpellId == activeSpellID then
-      CooldownCursor:HideIconNow()
+    if #iconsByPriority > 0 then
+      local iconFrame = iconsByPriority[1].iconFrame
+      if iconFrame then
+        RemoveIconForSpell(iconsByPriority[1].spellID, CooldownCursorDB.fadeOutDuration == 0)
+      end
     end
-  end)
+    lastSpellId = nil
+    activeSpellID = nil
+  end
 end
 
 ----------------------------------------------------
@@ -682,67 +1069,56 @@ end
 -- Settings API
 ----------------------------------------------------
 
--- Get addon version from metadata
 function CooldownCursor:GetVersion()
   return C_AddOns.GetAddOnMetadata(addonName, "Version")
 end
 
--- Get addon version from metadata
+function CooldownCursor:GetMajorVersion()
+  local major = C_AddOns.GetAddOnMetadata(addonName, "Version")
+  return major:match("^(%d+)")
+end
+
 function CooldownCursor:GetAuthor()
   return C_AddOns.GetAddOnMetadata(addonName, "Author")
 end
 
--- Get addon notes from metadata
 function CooldownCursor:GetNotes()
   return C_AddOns.GetAddOnMetadata(addonName, "Notes")
 end
 
--- Get a value from the SavedVariables table
 function CooldownCursor:GetDBValue(key)
   return CooldownCursorDB[key] or defaults[key]
 end
 
--- Set a string value in the SavedVariables table
 function CooldownCursor:SetDBString(key, value)
   CooldownCursorDB[key] = string.format("%s", value)
   self:UpdateDisplay()
 end
 
--- Set a numeric value in the SavedVariables table
 function CooldownCursor:SetDBNumber(key, value)
   CooldownCursorDB[key] = tonumber(value)
   self:UpdateDisplay()
 end
 
--- Set a boolean value in the SavedVariables table
 function CooldownCursor:SetDBBoolean(key, value)
   CooldownCursorDB[key] = value and true or false
   self:UpdateDisplay()
 end
 
 function CooldownCursor:AddOrUpdateSpellRule(spellID, ruleData)
-  -- Validate spellID
   spellID = tonumber(spellID)
-  if not spellID then
-    return false, "Invalid spell ID"
-  end
+  if not spellID then return false, "Invalid spell ID" end
 
   local spellName = C_Spell.GetSpellInfo(spellID)
-  if not spellName then
-    return false, "Unknown spell ID"
-  end
+  if not spellName then return false, "Unknown spell ID" end
 
-  -- Ensure root table exists
   CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or {}
   CooldownCursorDB.spellRules.settings = CooldownCursorDB.spellRules.settings or {}
   CooldownCursorDB.spellRules.rules = CooldownCursorDB.spellRules.rules or {}
 
   local rules = CooldownCursorDB.spellRules.rules
-
-  -- Create rule if missing
   rules[spellID] = rules[spellID] or {}
 
-  -- Apply fields (partial update safe)
   for k, v in pairs(ruleData or {}) do
     rules[spellID][k] = v
   end
@@ -751,11 +1127,7 @@ function CooldownCursor:AddOrUpdateSpellRule(spellID, ruleData)
 end
 
 function CooldownCursor:RemoveSpellRule(spellID)
-  if not CooldownCursorDB.spellRules
-    or not CooldownCursorDB.spellRules.rules then
-    return
-  end
-
+  if not CooldownCursorDB.spellRules or not CooldownCursorDB.spellRules.rules then return end
   CooldownCursorDB.spellRules.rules[spellID] = nil
   CooldownCursor:UpdateDisplay()
   CooldownCursor:RebuildSpellRuleOptions()
@@ -766,47 +1138,32 @@ function CooldownCursor:GetEffectiveIconSize(spellID)
   local globalSize = self:GetDBValue("iconSize")
   local rulesData = CooldownCursorDB.spellRules
 
-  if not rulesData or not rulesData.rules then
-    return globalSize
-  end
+  if not rulesData or not rulesData.rules then return globalSize end
 
   local rule = rulesData.rules[spellID]
-  if not rule then
-    return globalSize
-  end
+  if not rule then return globalSize end
 
-  -- Per-spell global toggle
-  if rule.useGlobalIconSize ~= false then
-    return globalSize
-  end
+  if rule.useGlobalIconSize ~= false then return globalSize end
 
-  -- Per-spell override
-  if rule.iconSize then
-    return rule.iconSize
-  end
+  if rule.iconSize then return rule.iconSize end
 
   return globalSize
 end
 
--- Set font names and paths in the SavedVariables table
 function CooldownCursor:SetFontPath(key, value)
   CooldownCursorDB[key] = value
-  CooldownCursorDB[key .. "Path"] = FontPath(
-    CooldownCursorDB[key])
+  CooldownCursorDB[key .. "Path"] = FontPath(CooldownCursorDB[key])
   self:UpdateDisplay()
 end
 
--- Get list of all available fonts
 function CooldownCursor:GetAllFonts()
   return FontNames()
 end
 
--- Get list of valid font types
 function CooldownCursor:GetValidFontTypes()
   return FONT_TYPES
 end
 
--- Get list of valid anchor positions
 function CooldownCursor:GetValidAnchorPositions()
   local positions = {}
   for k, v in pairs(ANCHOR_POSITION) do
@@ -815,7 +1172,6 @@ function CooldownCursor:GetValidAnchorPositions()
   return positions
 end
 
--- Get list of valid frame strata
 function CooldownCursor:GetValidFrameStratas()
   local stratas = {}
   for k, v in pairs(FRAME_STRATA) do
@@ -824,7 +1180,6 @@ function CooldownCursor:GetValidFrameStratas()
   return stratas
 end
 
--- Get list of valid spell text anchor positions
 function CooldownCursor:GetValidSpellTextAnchorPositions()
   local positions = {}
   for k, v in pairs(SPELL_TEXT_ANCHOR_POINTS) do
@@ -833,7 +1188,6 @@ function CooldownCursor:GetValidSpellTextAnchorPositions()
   return positions
 end
 
--- Get list of valid cooldown text anchor positions
 function CooldownCursor:GetValidCooldownTextAnchorPositions()
   local positions = {}  
   for k, v in pairs(CD_TEXT_ANCHOR_POINTS) do
@@ -842,39 +1196,28 @@ function CooldownCursor:GetValidCooldownTextAnchorPositions()
   return positions
 end
 
--- Validation font type
 function CooldownCursor:GetValidFontType(ftype)
   local fontType = string.upper(ftype)
-  if fontType == "NONE" then
-    -- nil fonts flags are allowed and valid with obj:SetFont()
-    -- FONT_TYPES["NONE"] is mapped to nil
-    return true
-  end
-  if FONT_TYPES[fontType] then
-    return true
-  end
+  if fontType == "NONE" then return true end
+  if FONT_TYPES[fontType] then return true end
   return false
 end
 
--- Validation anchor position
 function CooldownCursor:GetValidAnchorPosition(pos)
   local anchor = string.upper(pos)
   return ANCHOR_POSITION[anchor] ~= nil
 end
 
--- Validation anchor position
 function CooldownCursor:GetValidSpellTextAnchorPosition(pos)
   local anchor = string.upper(pos)
   return SPELL_TEXT_ANCHOR_POINTS[anchor] ~= nil
 end
 
--- Validation cooldown text anchor position
 function CooldownCursor:GetValidCooldownTextAnchorPosition(pos)
   local anchor = string.upper(pos)
   return CD_TEXT_ANCHOR_POINTS[anchor] ~= nil
 end
 
--- Validation frame strata
 function CooldownCursor:GetValidFrameStrata(strata)
   local fs = string.upper(strata)
   return FRAME_STRATA[fs] ~= nil
@@ -882,18 +1225,10 @@ end
 
 function CooldownCursor:SetHideAfter(seconds)
   CooldownCursorDB.hideAfter = tonumber(seconds) or defaults.hideAfter
-  -- If icon currently visible, re-arm timer using new value
-  if icon:IsShown() and lastSpellId then
-    ScheduleHideTimer()
-  end
 end
 
 function CooldownCursor:SetFadeOutDuration(seconds)
   CooldownCursorDB.fadeOutDuration = tonumber(seconds) or defaults.fadeOutDuration
-  -- If icon currently visible, re-arm timer using new value 
-  if icon:IsShown() and not previewActive then
-    CooldownCursor:HideIconNow()
-  end
 end
 
 function CooldownCursor:GetPreviewMouseMode()
@@ -908,67 +1243,104 @@ function CooldownCursor:SetPreviewMouseMode(enabled)
 end
 
 function CooldownCursor:ResetSettings()
-  CooldownCursor:HideIconNow()
   local rules = CooldownCursorDB.spellRules
+  local major = tonumber(self:GetMajorVersion()) or 0
+  CooldownCursor:HideIconNow()
   CooldownCursorDB = {}
   self:ApplyDefaults()
   self:UpdateDisplay()
-  CooldownCursor:SetPreviewMouseMode(false)
-  CooldownCursorDB.spellRules = rules -- Preserve spell rules
+  CooldownCursor:SetPreviewMouseMode(true)
+  CooldownCursorDB.spellRules = rules
+  CooldownCursorDB._version = major
+
 end
 
+
 ----------------------------------------------------
--- Show icon + cooldown
+-- Multi-Icon Public API
 ----------------------------------------------------
-local function ShowSpellIcon(spellID, durationObject)
-  local spellInfo = C_Spell.GetSpellInfo(spellID)
-  if not spellInfo or not spellInfo.iconID then return end
 
-  -- Apply settings before showing
-  CooldownCursor:UpdateDisplay(spellID)
-
-  -- Pop in animation
-  if CooldownCursorDB.animation then
-    icon:SetScale(1)
-    icon.showAnim:Stop()
-    icon.showAnim:Play()
+function CooldownCursor:HideAllIcons(immediate)
+  for spellID, _ in pairs(activeIcons) do
+    RemoveIconForSpell(spellID, immediate or false)
   end
+  activeIcons = {}
+  iconsByPriority = {}
+end
 
-  icon.icon:SetTexture(spellInfo.iconID)
-  icon.cooldown:SetCooldownFromDurationObject(durationObject) -- https://warcraft.wiki.gg/wiki/API_Cooldown_SetCooldownFromDurationObject
+function CooldownCursor:GetActiveIconCount()
+  return #iconsByPriority
+end
 
-  activeSpellID = spellID
+function CooldownCursor:IsMultiIconEnabled()
+  local stackDirection = CooldownCursorDB.stackDirection or defaults.stackDirection
+  return stackDirection ~= STACK_DIRECTION.SINGLE
+end
 
-  if CooldownCursorDB.showSpellNames and spellInfo.name then
-    icon.text:SetText(spellInfo.name)
-    icon.text:Show()
-  else
-    icon.text:Hide()
+function CooldownCursor:InitMultiIconSystem()
+  InitializeIconPool()
+
+  if MasqueGroup and #iconPool > 0 then
+    local firstIcon = iconPool[1]
+    MasqueGroup:AddButton(firstIcon, {
+      Icon = firstIcon.icon,
+      Cooldown = firstIcon.cooldown,
+    })
   end
+end
 
-  icon:SetScript("OnUpdate", UpdateCooldownIconFrame)
+function CooldownCursor:GetValidSortOrders()
+  return {
+    ALPHABETICAL = "Alphabetical",
+    PRIORITY = "Priority (Spell Rules)",
+    TIME_ADDED = "Time Added (Oldest First)",
+  }
+end
 
-  -- Stop any fade-out in progress so it doesn't hide us on finish
-  icon.fadeOut:Stop()
-  icon.icon:SetAlpha(
-    PercentToAlpha(CooldownCursorDB.iconAlpha)
-  )
+function CooldownCursor:GetValidStackDirections()
+  return {
+    VERTICAL = "Vertical",
+    SINGLE = "Single (Override)",
+    HORIZONTAL = "Horizontal",
+    RADIUS = "Radius (Circle)",
+  }
+end
 
-  icon:Show()
+function CooldownCursor:GetValidStackGrowth()
+  local direction = CooldownCursorDB.stackDirection or STACK_DIRECTION.VERTICAL
 
-  -- Always (re)schedule hide after showing
-  ScheduleHideTimer()
+  if direction == STACK_DIRECTION.SINGLE then
+    return {
+      DOWN = "N/A",
+    }
+  elseif direction == STACK_DIRECTION.VERTICAL then
+    return {
+      DOWN = "Down",
+      UP = "Up",
+    }
+  elseif direction == STACK_DIRECTION.HORIZONTAL then
+    return {
+      LEFT = "Left",
+      RIGHT = "Right",
+    }
+  else -- RADIUS
+    return {
+      CLOCKWISE = "Clockwise",
+      COUNTERCLOCKWISE = "Counter-Clockwise",
+    }
+  end
 end
 
 ----------------------------------------------------
 -- Live Preview API
 ----------------------------------------------------
 function CooldownCursor:Preview()
-  local previewSpellID = 116 -- Frostbolt (safe)
-  local previewDuration = 30
-  local durationObject = C_DurationUtil.CreateDuration() -- https://warcraft.wiki.gg/wiki/API_C_DurationUtil.CreateDuration
-  durationObject:SetTimeFromStart(GetTime(), previewDuration)
+  if self:IsMultiIconEnabled() then
+    self:PreviewMultiIcon()
+    return
+  end
 
+  -- Toggle off
   if previewActive then
     previewActive = false
     if previewTicker then
@@ -979,29 +1351,110 @@ function CooldownCursor:Preview()
     return
   end
 
-
+  -- Start preview
   previewActive = true
-  ShowSpellIcon(previewSpellID, false, durationObject)
-  CooldownCursor:ApplyPreviewPosition()
+  
+  local function ShowPreviewIcon()
+    local previewSpellID = 116
+    local previewDuration = 30
+    local durationObj = C_DurationUtil.CreateDuration()
+    durationObj:SetTimeFromStart(GetTime(), previewDuration)
+    ShowSpellIcon(previewSpellID, durationObj)
+    CooldownCursor:ApplyPreviewPosition()
+  end
+  
+  -- Show initial icon
+  ShowPreviewIcon()
+  
+  -- Loop every 30 seconds to restart the preview
+  previewTicker = C_Timer.NewTicker(30, function()
+    if previewActive then
+      ShowPreviewIcon()
+    else
+      if previewTicker then
+        previewTicker:Cancel()
+        previewTicker = nil
+      end
+    end
+  end)
+end
 
-  previewTicker = C_Timer.NewTicker(durationObject:GetRemainingDuration(0), function()
-    if previewActive and icon:IsShown() then
-      icon.cooldown:SetCooldownFromDurationObject(durationObject)
+function CooldownCursor:PreviewMultiIcon()
+  -- Toggle off
+  if previewActive then
+    previewActive = false
+    if previewTicker then
+      previewTicker:Cancel()
+      previewTicker = nil
+    end
+    self:HideAllIcons(true)
+    return
+  end
+
+  -- Start preview
+  previewActive = true
+  
+  -- Pool of different spells with varying durations
+  local spellPool = {
+    { id = 116,   duration = 30 },  -- Frostbolt
+    { id = 133,   duration = 15 },  -- Fireball
+    { id = 11426, duration = 45 },  -- Ice Barrier
+    { id = 2136,  duration = 20 },  -- Fire Blast
+    { id = 118,   duration = 35 },  -- Polymorph
+    { id = 122,   duration = 25 },  -- Frost Nova
+    { id = 1459,  duration = 40 },  -- Arcane Intellect
+    { id = 130,   duration = 12 },  -- Slow Fall
+    { id = 475,   duration = 50 },  -- Remove Curse
+    { id = 1953,  duration = 18 },  -- Blink
+  }
+  
+  local function ShowPreviewIcons()
+    -- Get number of icons to show based on maxIcons setting
+    local maxIcons = CooldownCursor:GetDBValue("maxIcons")
+    local numToShow = math.min(maxIcons, #spellPool)
+    
+    -- Show the specified number of preview icons
+    for i = 1, numToShow do
+      local spellData = spellPool[i]
+      local durationObj = C_DurationUtil.CreateDuration()
+      durationObj:SetTimeFromStart(GetTime(), spellData.duration)
+      ShowSpellIcon(spellData.id, durationObj)
+    end
+    CooldownCursor:ApplyPreviewPosition()
+  end
+  
+  -- Show initial icons
+  ShowPreviewIcons()
+  
+  -- Loop every 50 seconds (longest cooldown) to restart the preview
+  previewTicker = C_Timer.NewTicker(50, function()
+    if previewActive then
+      ShowPreviewIcons()
+    else
+      if previewTicker then
+        previewTicker:Cancel()
+        previewTicker = nil
+      end
     end
   end)
 end
 
 function CooldownCursor:ApplyPreviewPosition()
-  if not previewActive or not icon:IsShown() then return end
+  if not previewActive then return end
 
   if previewMouseMode then
-    icon:SetScript("OnUpdate", UpdateCooldownIconFrame)
+    for _, iconData in ipairs(iconsByPriority) do
+      iconData.iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
+    end
   else
-    icon:SetScript("OnUpdate", nil)
-    icon:SetFrameStrata("HIGH")
-    icon:ClearAllPoints()
-    local anchor = SettingsPanel or UIParent
-    icon:SetPoint("LEFT", anchor, "RIGHT", 8, 0)
+    for _, iconData in ipairs(iconsByPriority) do
+      local icon = iconData.iconFrame
+      icon:SetScript("OnUpdate", nil)
+      icon:SetFrameStrata("HIGH")
+      icon:ClearAllPoints()
+      local anchor = SettingsPanel or UIParent
+      icon:SetPoint("LEFT", anchor, "RIGHT", 8, 0)
+    end
   end
 end
 
@@ -1012,7 +1465,10 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if event == "ADDON_LOADED" then
     local name = ...
     if name ~= addonName then return end
+    -- Set release notes for display in Options UI
+    self:ApplyBreakingChangesAndSetReleaseNotes()
     self:ApplyDefaults()
+    self:InitMultiIconSystem()
     self:UpdateDisplay()
     self:InitAce3Options()
     self:UnregisterEvent("ADDON_LOADED")
@@ -1035,7 +1491,12 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
-  if event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" then
+  if event == "UNIT_SPELLCAST_FAILED"
+    or event == "UNIT_SPELLCAST_SENT"
+    or event == "UNIT_SPELLCAST_SUCCEEDED"
+    or event == "SPELL_UPDATE_COOLDOWN" then
+    local spellID
+    local unit
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
       return
     end
@@ -1048,45 +1509,54 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       return
     end
 
-    local unit, _, spellID = ...
-    if unit ~= "player" or not spellID then return end
+    -- SPELL_UPDATE_COOLDOWN will update cooldown
+    -- that buffs, talents or items may cause.
+    if event == "SPELL_UPDATE_COOLDOWN" then
+      spellID, _, _, _ = ...
+    else
+      unit, _, spellID = ...
+      -- Cache spellID that are not SPELL_UPDATE_COOLDOWN events
+      -- This allows only tracking spells that have triggered the icon display
+      if tonumber(spellID) then table.insert(cachedCDSpells, spellID, true) end
+      if unit ~= "player" then return end
+    end
+    if not spellID or not cachedCDSpells[spellID] then return end
 
     -- Delay slightly to allow cooldown to register
     C_Timer.After(0.05, function()
       local cd = C_Spell.GetSpellCooldown(spellID)
-      local durationObject = C_Spell.GetSpellCooldownDuration(spellID) -- https://warcraft.wiki.gg/wiki/ScriptObject_DurationObject
-      local usable = C_Spell.IsSpellUsable(spellID)
-      local inRange = C_Spell.IsSpellInRange(spellID)
-      if usable == false or inRange == false then return end
+      local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
 
-      -- ignore spells with no cooldown
-      -- will only checks out-of-combat cooldowns
-      -- in-combat cooldowns are handled via isOnGCD check
-      if not IsSecretValue(cd.startTime) and cd.startTime == 0 then return end
-
+      -- Quick checks: existence and GCD
       if not cd or cd.isOnGCD or not durationObject then return end
 
-      -- Check spell rules
+      -- Filter out non-cooldown abilities (buffs, mounts, etc.)
+      -- Abilities with no real cooldown have startTime == 0
+      -- IsSecretValue protects against taint in combat
+      if not IsSecretValue(cd.startTime) and cd.startTime == 0 then return end
+
+      local usable = C_Spell.IsSpellUsable(spellID)
+      local inRange = C_Spell.IsSpellInRange(spellID)
+
+      -- Check spell usability
+      if usable == false or inRange == false then return end
+
+      -- Check user spell rules
       local show, rule = CooldownCursor:GetSpellRule(spellID)
       if not show then return end
 
-      -- Different spell overrides current display immediately
-      if lastSpellId and lastSpellId ~= spellID then
-        CooldownCursor:HideIconNow()
-      end
-
-      lastSpellId = spellID
       ShowSpellIcon(spellID, durationObject)
     end)
   end
-
 end)
 
 ----------------------------------------------------
 -- Register events
 ----------------------------------------------------
 CooldownCursor:RegisterEvent("ADDON_LOADED")
+CooldownCursor:RegisterEvent("UNIT_SPELLCAST_SENT")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+CooldownCursor:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_FAILED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_DISABLED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_ENABLED")

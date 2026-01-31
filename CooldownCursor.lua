@@ -178,6 +178,7 @@ function CooldownCursor:ApplyDefaults()
       CooldownCursorDB[k] = v
     end
   end
+  CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
 end
 
 function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
@@ -1468,8 +1469,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if event == "ADDON_LOADED" then
     local name = ...
     if name ~= addonName then return end
-    -- Set release notes for display in Options UI
-    self:ApplyBreakingChangesAndSetReleaseNotes()
     self:ApplyDefaults()
     self:InitMultiIconSystem()
     self:UpdateDisplay()

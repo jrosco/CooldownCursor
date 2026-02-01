@@ -28,6 +28,12 @@ local SHOW_WHEN_STATE = {
   NON_COMBAT = 2,
 }
 
+local SHOW_BEHAVIOR = {
+  AUTO_HIDE_AFTER = 0, -- Show on cooldown, auto-hide after X seconds (default, original behaviour)
+  ON_COOLDOWN = 1,     -- Show on cooldown, remove icon when spell comes off cooldown
+  OFF_COOLDOWN = 2,    -- Show only when spell is ready (off cooldown)
+}
+
 local ANCHOR_POSITION = {
   CENTER = "CENTER",
   TOP = "TOP",
@@ -135,11 +141,12 @@ local defaults = {
   iconHide = false,
   showSpellNames = false,
   hideCooldownNumbers = false,
-  showCooldownSwipe = false,
+  showCooldownSwipe = true,
   hideAfter = 30,
   animation = false,
   fadeOutDuration = 0,
   showWhen = SHOW_WHEN_STATE.COMBAT,
+  showBehavior = SHOW_BEHAVIOR.AUTO_HIDE_AFTER,
   hideWhileMounted = false,
   anchor = ANCHOR_POSITION.TOPRIGHT,
   anchorPadding = 2,
@@ -161,7 +168,7 @@ local defaults = {
   spellRules = spellRules,
 
   -- Multiple Icon Display Settings
-  maxIcons = 5,
+  maxIcons = 10,
   stackDirection = STACK_DIRECTION.HORIZONTAL,
   stackSpacing = 4,
   sortOrder = SORT_ORDER.PRIORITY,
@@ -921,7 +928,7 @@ local function ShowSpellIcon(spellID, durationObject)
       ScheduleHideTimerForIcon(iconFrame, spellID)
       SortIcons()
       UpdateIconPositions()
-      return
+      return -- caller will run ApplyShowBehavior() after us
     end
 
     -- Get icon from pool
@@ -1029,6 +1036,71 @@ local function ShowSpellIcon(spellID, durationObject)
     iconFrame:Show()
 
     ScheduleHideTimerForIcon(iconFrame, spellID)
+  end
+end
+
+----------------------------------------------------
+-- Show Behavior
+----------------------------------------------------
+-- AUTO_HIDE_AFTER: does nothing here, handled by ScheduleHideTimerForIcon as before.
+-- ON_COOLDOWN:     removes icons whose cooldown has ended.
+-- OFF_COOLDOWN:    seeds icons from rules, then hides/shows based on cooldown state.
+local function ApplyShowBehavior()
+  local showBehavior = CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
+
+  -- AUTO_HIDE_AFTER - nothing extra to do here
+  if showBehavior == SHOW_BEHAVIOR.AUTO_HIDE_AFTER then
+    return
+  end
+
+  -- OFF_COOLDOWN: seed icons for any rule-listed spells not yet tracked.
+  -- We need the icons to exist so their cooldown frames stay current
+  -- and we can check IsShown() on each event.
+  if showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN then
+    local rules = CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules
+    if rules then
+      for spellID, rule in pairs(rules) do
+        if rule.enabled ~= false and not activeIcons[spellID] then
+          local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
+          if durationObject then
+            ShowSpellIcon(spellID, durationObject)
+          end
+        end
+      end
+    end
+  end
+
+  -- Collect spellIDs to remove (ON_COOLDOWN mode).
+  -- We cannot call RemoveIconForSpell inside the loop because it
+  -- modifies activeIcons while we are iterating it.
+  local toRemove = {}
+
+  for spellID, iconData in pairs(activeIcons) do
+    local iconFrame = iconData.iconFrame
+    if iconFrame then
+      local isOnCooldown = iconFrame.cooldown:IsShown()
+
+      if showBehavior == SHOW_BEHAVIOR.ON_COOLDOWN then
+        -- ON_COOLDOWN: icon should only be visible while on cooldown.
+        -- Mark for removal once the cooldown ends.
+        if not isOnCooldown then
+          table.insert(toRemove, spellID)
+        end
+      elseif showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN then
+        -- OFF_COOLDOWN: icon should only be visible when ready.
+        -- Use SetAlpha so the cooldown frame stays alive and keeps updating.
+        if isOnCooldown then
+          iconFrame:SetAlpha(0)
+        else
+          iconFrame:SetAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
+        end
+      end
+    end
+  end
+
+  -- Now safe to remove - we are no longer iterating activeIcons
+  for _, spellID in ipairs(toRemove) do
+    RemoveIconForSpell(spellID, false)
   end
 end
 
@@ -1479,18 +1551,30 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   end
 
   if event == "PLAYER_REGEN_DISABLED" then
+    -- Entering combat
     inCombat = true
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT then
       CooldownCursor:HideIconNow()
     end
+    ApplyShowBehavior()
     return
   end
 
   if event == "PLAYER_REGEN_ENABLED" then
+    -- Exiting combat
     inCombat = false
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT then
       CooldownCursor:HideIconNow()
     end
+    -- OFF_COOLDOWN mode: icons only make sense in combat, clear everything
+    if (CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.ON_COOLDOWN) == SHOW_BEHAVIOR.OFF_COOLDOWN then
+      CooldownCursor:HideAllIcons(true)
+    end
+    return
+  end
+
+  if event == "SPELL_UPDATE_USABLE" and inCombat then
+    ApplyShowBehavior()
     return
   end
 
@@ -1525,6 +1609,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
     if not spellID or not cachedCDSpells[spellID] then return end
 
+
     -- Delay slightly to allow cooldown to register
     C_Timer.After(0.05, function()
       local cd = C_Spell.GetSpellCooldown(spellID)
@@ -1542,13 +1627,17 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       local inRange = C_Spell.IsSpellInRange(spellID)
 
       -- Check spell usability
-      if usable == false or inRange == false then return end
+      if (usable == false or inRange == false) and
+          CooldownCursorDB.showBehavior ~= SHOW_BEHAVIOR.OFF_COOLDOWN then
+        return
+      end
 
       -- Check user spell rules
       local show, rule = CooldownCursor:GetSpellRule(spellID)
       if not show then return end
 
       ShowSpellIcon(spellID, durationObject)
+      ApplyShowBehavior()
     end)
   end
 end)
@@ -1560,6 +1649,7 @@ CooldownCursor:RegisterEvent("ADDON_LOADED")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_SENT")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 CooldownCursor:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+CooldownCursor:RegisterEvent("SPELL_UPDATE_USABLE")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_FAILED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_DISABLED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_ENABLED")

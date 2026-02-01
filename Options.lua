@@ -250,6 +250,14 @@ local function ShowWhenValues()
   }
 end
 
+local function ShowBehaviorValues()
+  return {
+    [0] = "Auto-Hide After",
+    [1] = "On Cooldown",
+    [2] = "Off Cooldown (Ready)",
+  }
+end
+
 local function HexColorGet(key, fallbackHex)
   -- AceConfig color expects r,g,b,a in 0..1
   local hex = (CooldownCursor:GetDBValue(key) or fallbackHex or "ffffff"):gsub("#", "")
@@ -383,6 +391,22 @@ local options = {
           set = function(_, v) CooldownCursor:SetDBNumber("showWhen", v) end,
         },
 
+        showBehavior = {
+          type = "select",
+          name = "Show Behavior",
+          desc = "On Cooldown - Icons appear when a spell goes on cooldown.\n\n" ..
+              "Off Cooldown - Icons appear when a spell comes off cooldown and is ready to use again.\n\n" ..
+              "Auto-Hide After - Icons appear when a spell goes on cooldown and automatically disappear after a set time. See 'Auto-Hide After' option.",
+          order = 25,
+          width = "normal",
+          values = ShowBehaviorValues(),
+          get = function() return CooldownCursor:GetDBValue("showBehavior") end,
+          set = function(_, v) 
+              CooldownCursor:SetDBNumber("showBehavior", v)
+              CooldownCursor:UpdateDisplay()
+            end,
+        },
+
         hideAfter = {
           type = "range",
           name = "Auto-Hide After",
@@ -393,6 +417,9 @@ local options = {
           min = 1,
           max = 120,
           step = 1,
+          disabled = function()
+            return CooldownCursor:GetDBValue("showBehavior") ~= 0
+          end,
           get = function() return CooldownCursor:GetDBValue("hideAfter") end,
           set = function(_, v) CooldownCursor:SetHideAfter(v) end,
         },

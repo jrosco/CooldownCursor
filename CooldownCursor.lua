@@ -746,12 +746,18 @@ end
 ----------------------------------------------------
 function UpdateIconPositions()
   local showBehavior = CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
+  local stackDirection = CooldownCursorDB.stackDirection or defaults.stackDirection
   local isOffCooldown = (showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN)
 
-  -- In OFF_COOLDOWN mode, only visible icons should occupy stack slots.
-  -- Count visible icons first so GetStackOffset gets the right total.
+  -- Radius + OFF_COOLDOWN: don't repack. Radius spaces icons evenly around
+  -- a circle using the total count, so changing that count as icons appear/
+  -- disappear causes all positions to jump. Just let them sit.
+  local repackVisible = isOffCooldown and (stackDirection ~= STACK_DIRECTION.RADIUS)
+
+  -- In OFF_COOLDOWN mode (non-Radius), only visible icons should occupy
+  -- stack slots. Count visible icons first so GetStackOffset gets the right total.
   local visibleCount = 0
-  if isOffCooldown then
+  if repackVisible then
     for _, iconData in ipairs(iconsByPriority) do
       if iconData.iconFrame and iconData.iconFrame:GetAlpha() > 0 then
         visibleCount = visibleCount + 1
@@ -761,20 +767,21 @@ function UpdateIconPositions()
     visibleCount = #iconsByPriority
   end
 
-  -- Assign positions. In OFF_COOLDOWN mode, invisible icons are parked
-  -- at 0,0 (they're invisible anyway). Visible icons get sequential slots
-  -- so they pack tightly with no gaps.
+  -- Assign positions. When repacking, invisible icons are parked at 0,0
+  -- (they're invisible anyway) and visible icons get sequential slots so
+  -- they pack tightly with no gaps.
   local visibleIndex = 0
-  for _, iconData in ipairs(iconsByPriority) do
+  for i, iconData in ipairs(iconsByPriority) do
     local iconFrame = iconData.iconFrame
     if iconFrame then
-      if isOffCooldown and iconFrame:GetAlpha() == 0 then
+      if repackVisible and iconFrame:GetAlpha() == 0 then
         -- Invisible - park it, no stack slot consumed
         iconFrame.stackOffsetX = 0
         iconFrame.stackOffsetY = 0
       else
-        -- Visible - assign the next sequential slot
-        local offsetX, offsetY = GetStackOffset(visibleIndex, visibleCount)
+        -- Visible (or not repacking) - assign the next sequential slot
+        local index = repackVisible and visibleIndex or (i - 1)
+        local offsetX, offsetY = GetStackOffset(index, visibleCount)
         iconFrame.stackOffsetX = offsetX
         iconFrame.stackOffsetY = offsetY
         visibleIndex = visibleIndex + 1

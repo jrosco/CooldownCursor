@@ -745,14 +745,40 @@ end
 -- Update Icon Positions
 ----------------------------------------------------
 function UpdateIconPositions()
-  local totalIcons = #iconsByPriority
+  local showBehavior = CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
+  local isOffCooldown = (showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN)
 
-  for i, iconData in ipairs(iconsByPriority) do
+  -- In OFF_COOLDOWN mode, only visible icons should occupy stack slots.
+  -- Count visible icons first so GetStackOffset gets the right total.
+  local visibleCount = 0
+  if isOffCooldown then
+    for _, iconData in ipairs(iconsByPriority) do
+      if iconData.iconFrame and iconData.iconFrame:GetAlpha() > 0 then
+        visibleCount = visibleCount + 1
+      end
+    end
+  else
+    visibleCount = #iconsByPriority
+  end
+
+  -- Assign positions. In OFF_COOLDOWN mode, invisible icons are parked
+  -- at 0,0 (they're invisible anyway). Visible icons get sequential slots
+  -- so they pack tightly with no gaps.
+  local visibleIndex = 0
+  for _, iconData in ipairs(iconsByPriority) do
     local iconFrame = iconData.iconFrame
     if iconFrame then
-      local offsetX, offsetY = GetStackOffset(i - 1, totalIcons)
-      iconFrame.stackOffsetX = offsetX
-      iconFrame.stackOffsetY = offsetY
+      if isOffCooldown and iconFrame:GetAlpha() == 0 then
+        -- Invisible - park it, no stack slot consumed
+        iconFrame.stackOffsetX = 0
+        iconFrame.stackOffsetY = 0
+      else
+        -- Visible - assign the next sequential slot
+        local offsetX, offsetY = GetStackOffset(visibleIndex, visibleCount)
+        iconFrame.stackOffsetX = offsetX
+        iconFrame.stackOffsetY = offsetY
+        visibleIndex = visibleIndex + 1
+      end
     end
   end
 end
@@ -799,6 +825,14 @@ end
 local function ScheduleHideTimerForIcon(iconFrame, spellID)
   -- Don't schedule hide timer during preview mode
   if previewActive then
+    return
+  end
+
+  -- Hide timer only applies to AUTO_HIDE_AFTER mode.
+  -- ON_COOLDOWN removes icons itself when cooldown ends.
+  -- OFF_COOLDOWN keeps icons alive permanently so it can show/hide them.
+  local showBehavior = CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
+  if showBehavior ~= SHOW_BEHAVIOR.AUTO_HIDE_AFTER then
     return
   end
 
@@ -1102,6 +1136,10 @@ local function ApplyShowBehavior()
   for _, spellID in ipairs(toRemove) do
     RemoveIconForSpell(spellID, false)
   end
+
+  -- Repack icon positions after visibility changes.
+  -- In OFF_COOLDOWN mode this collapses gaps left by invisible icons.
+  UpdateIconPositions()
 end
 
 ----------------------------------------------------
@@ -1173,6 +1211,12 @@ end
 
 function CooldownCursor:SetDBNumber(key, value)
   CooldownCursorDB[key] = tonumber(value)
+  -- Switching showBehavior leaves stale icons (wrong alphas, wrong set of
+  -- icons tracked). Clear everything and let ApplyShowBehavior re-seed.
+  if key == "showBehavior" then
+    self:HideAllIcons(true)
+    ApplyShowBehavior()
+  end
   self:UpdateDisplay()
 end
 
@@ -1567,7 +1611,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       CooldownCursor:HideIconNow()
     end
     -- OFF_COOLDOWN mode: icons only make sense in combat, clear everything
-    if (CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.ON_COOLDOWN) == SHOW_BEHAVIOR.OFF_COOLDOWN then
+    if (CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER) == SHOW_BEHAVIOR.OFF_COOLDOWN then
       CooldownCursor:HideAllIcons(true)
     end
     return

@@ -393,10 +393,10 @@ local options = {
 
         showBehavior = {
           type = "select",
-          name = "Show Behavior",
-          desc = "On Cooldown - Icons appear when a spell goes on cooldown.\n\n" ..
-              "Off Cooldown - Icons appear when a spell comes off cooldown and is ready to use again.\n\n" ..
-              "Auto-Hide After - Icons appear when a spell goes on cooldown and automatically disappear after a set time. See 'Auto-Hide After' option.",
+          name = "Show Behavior |cff345BFF(Experimental)|r",
+          desc = "On Cooldown |cffFF1E34(Experimental)|r - Icons appear when a spell goes on cooldown.\n\n" ..
+              "Off Cooldown |cffFF1E34(Experimental)|r - Icons appear when a spell comes off cooldown and is ready to use again.\n\n" ..
+              "Auto-Hide After |cffFFFFFF(Default/Legacy)|r - Icons appear when a spell goes on cooldown and automatically disappear after a set time. See 'Auto-Hide After' option.",
           order = 25,
           width = "normal",
           values = ShowBehaviorValues(),
@@ -789,8 +789,21 @@ local options = {
             return CooldownCursor:GetDBValue("stackGrowth")
           end,
           set = function(_, v)
+            print("Growth Direction:", v)
             CooldownCursor:SetDBString("stackGrowth", v)
           end,
+        },
+
+        anchor = {
+          type = "select",
+          name = "Anchor Point",
+          desc = "Where to position the icon relative to your cursor.\n\n" ..
+              "TOPLEFT = Icon appears above and left of cursor",
+          order = 21,
+          width = "normal",
+          values = AnchorValues,
+          get = function() return CooldownCursor:GetDBValue("anchor") end,
+          set = function(_, v) CooldownCursor:SetDBString("anchor", v) end,
         },
 
         spacer2 = {

@@ -445,6 +445,26 @@ local function FontNames()
 end
 
 ----------------------------------------------------
+-- Generic table keys helper
+----------------------------------------------------
+local function GetTableKeys(tbl)
+  local keys = {}
+  for k in pairs(tbl) do
+    table.insert(keys, k)
+  end
+  return keys
+end
+
+----------------------------------------------------
+-- Generic validation helper
+----------------------------------------------------
+local function IsValidTableKey(tbl, key)
+  if not key then return false end
+  local upper = string.upper(key)
+  return tbl[upper] ~= nil
+end
+
+----------------------------------------------------
 --- Internal Color helper
 --------------------------------------------------
 local function HexToRGB(hex)
@@ -842,73 +862,80 @@ function CooldownCursor:GetSpellRule(spellID)
 end
 
 ----------------------------------------------------
+-- Icon Setup Helper
+----------------------------------------------------
+local function SetupNewIcon(spellID, spellInfo, durationObject)
+  local iconFrame = GetIconFromPool()
+  if not iconFrame then return nil, nil end
+
+  local _, rule = CooldownCursor:GetSpellRule(spellID)
+  local priority = (rule and rule.priority) or 0
+
+  local iconData = {
+    spellID = spellID,
+    iconFrame = iconFrame,
+    durationObject = durationObject,
+    spellName = spellInfo.name,
+    addedTime = GetTime(),
+    priority = priority,
+  }
+
+  activeIcons[spellID] = iconData
+  table.insert(iconsByPriority, iconData)
+
+  iconFrame.spellID = spellID
+  iconFrame.addedTime = iconData.addedTime
+  iconFrame.priority = priority
+
+  CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
+
+  iconFrame.icon:SetTexture(spellInfo.iconID)
+  iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
+
+  if CooldownCursorDB.showSpellNames and spellInfo.name then
+    iconFrame.text:SetText(spellInfo.name)
+    iconFrame.text:Show()
+  else
+    iconFrame.text:Hide()
+  end
+
+  if CooldownCursorDB.animation then
+    iconFrame:SetScale(1)
+    iconFrame.showAnim:Stop()
+    iconFrame.showAnim:Play()
+  end
+
+  iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha))
+  iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
+  iconFrame:Show()
+
+  return iconFrame, iconData
+end
+
+----------------------------------------------------
 -- Show icon + cooldown
 ----------------------------------------------------
 local function ShowSpellIcon(spellID, durationObject)
   local spellInfo = C_Spell.GetSpellInfo(spellID)
   if not spellInfo or not spellInfo.iconID then return end
-  -- Check if SINGLE mode (override behavior)
+
   local stackDirection = CooldownCursorDB.stackDirection or defaults.stackDirection
   local isSingleMode = (stackDirection == STACK_DIRECTION.SINGLE)
 
   if isSingleMode then
     -- SINGLE mode: Always override with newest spell
-    -- Hide any existing icons
     if #iconsByPriority > 0 then
       for i = #iconsByPriority, 1, -1 do
         RemoveIconForSpell(iconsByPriority[i].spellID, true)
       end
     end
 
-    -- Show the new spell
-    local iconFrame = GetIconFromPool()
-    if not iconFrame then return end
-
-    local show, rule = CooldownCursor:GetSpellRule(spellID)
-    local priority = (rule and rule.priority) or 0
-
-    local iconData = {
-      spellID = spellID,
-      iconFrame = iconFrame,
-      durationObject = durationObject,
-      spellName = spellInfo.name,
-      addedTime = GetTime(),
-      priority = priority,
-    }
-
-    activeIcons[spellID] = iconData
-    table.insert(iconsByPriority, iconData)
-
-    iconFrame.spellID = spellID
-    iconFrame.addedTime = iconData.addedTime
-    iconFrame.priority = priority
-
-    CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
-
-    iconFrame.icon:SetTexture(spellInfo.iconID)
-    iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
-
-    if CooldownCursorDB.showSpellNames and spellInfo.name then
-      iconFrame.text:SetText(spellInfo.name)
-      iconFrame.text:Show()
-    else
-      iconFrame.text:Hide()
+    local iconFrame = SetupNewIcon(spellID, spellInfo, durationObject)
+    if iconFrame then
+      ScheduleHideTimerForIcon(iconFrame, spellID)
     end
-
-    if CooldownCursorDB.animation then
-      iconFrame:SetScale(1)
-      iconFrame.showAnim:Stop()
-      iconFrame.showAnim:Play()
-    end
-
-    iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha))
-    iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
-    iconFrame:Show()
-
-    ScheduleHideTimerForIcon(iconFrame, spellID)
     return
   end
-
 
   if CooldownCursor:IsMultiIconEnabled() then
     -- If spell already exists, update it instead of creating duplicate
@@ -923,111 +950,13 @@ local function ShowSpellIcon(spellID, durationObject)
       return
     end
 
-    -- Get icon from pool
-    local iconFrame = GetIconFromPool()
-    if not iconFrame then return end
-
-    local show, rule = CooldownCursor:GetSpellRule(spellID)
-    local priority = (rule and rule.priority) or 0
-
-    local iconData = {
-      spellID = spellID,
-      iconFrame = iconFrame,
-      durationObject = durationObject,
-      spellName = spellInfo.name,
-      addedTime = GetTime(),
-      priority = priority,
-    }
-
-    -- Register in both tracking tables
-    activeIcons[spellID] = iconData
-    table.insert(iconsByPriority, iconData)
-
-    iconFrame.spellID = spellID
-    iconFrame.addedTime = iconData.addedTime
-    iconFrame.priority = priority
-
-    CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
-
-    iconFrame.icon:SetTexture(spellInfo.iconID)
-    iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
-
-    if CooldownCursorDB.showSpellNames and spellInfo.name then
-      iconFrame.text:SetText(spellInfo.name)
-      iconFrame.text:Show()
-    else
-      iconFrame.text:Hide()
+    local iconFrame = SetupNewIcon(spellID, spellInfo, durationObject)
+    if iconFrame then
+      SortIcons()
+      UpdateIconPositions()
+      EnforceMaxIcons()
+      ScheduleHideTimerForIcon(iconFrame, spellID)
     end
-
-    if CooldownCursorDB.animation then
-      iconFrame:SetScale(1)
-      iconFrame.showAnim:Stop()
-      iconFrame.showAnim:Play()
-    end
-
-    iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha))
-    iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
-    iconFrame:Show()
-
-    SortIcons()
-    UpdateIconPositions()
-    EnforceMaxIcons()
-    ScheduleHideTimerForIcon(iconFrame, spellID)
-  else
-    -- Single icon mode
-    if lastSpellId and lastSpellId ~= spellID then
-      CooldownCursor:HideIconNow()
-    end
-
-    lastSpellId = spellID
-    activeSpellID = spellID
-
-    local iconFrame
-    local existingData = activeIcons[spellID]
-
-    if existingData then
-      iconFrame = existingData.iconFrame
-    else
-      iconFrame = GetIconFromPool()
-      if not iconFrame then return end
-
-      local iconData = {
-        spellID = spellID,
-        iconFrame = iconFrame,
-        durationObject = durationObject,
-        spellName = spellInfo.name,
-        addedTime = GetTime(),
-        priority = 0,
-      }
-      activeIcons[spellID] = iconData
-      table.insert(iconsByPriority, iconData)
-    end
-
-    iconFrame.spellID = spellID
-    CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
-
-    if CooldownCursorDB.animation then
-      iconFrame:SetScale(1)
-      iconFrame.showAnim:Stop()
-      iconFrame.showAnim:Play()
-    end
-
-    iconFrame.icon:SetTexture(spellInfo.iconID)
-    iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
-
-    if CooldownCursorDB.showSpellNames and spellInfo.name then
-      iconFrame.text:SetText(spellInfo.name)
-      iconFrame.text:Show()
-    else
-      iconFrame.text:Hide()
-    end
-
-    iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
-    iconFrame.fadeOut:Stop()
-    iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha))
-    iconFrame:Show()
-
-    ScheduleHideTimerForIcon(iconFrame, spellID)
   end
 end
 
@@ -1168,62 +1097,42 @@ function CooldownCursor:GetValidFontTypes()
 end
 
 function CooldownCursor:GetValidAnchorPositions()
-  local positions = {}
-  for k, v in pairs(ANCHOR_POSITION) do
-    table.insert(positions, k)
-  end
-  return positions
+  return GetTableKeys(ANCHOR_POSITION)
 end
 
 function CooldownCursor:GetValidFrameStratas()
-  local stratas = {}
-  for k, v in pairs(FRAME_STRATA) do
-    table.insert(stratas, k)
-  end
-  return stratas
+  return GetTableKeys(FRAME_STRATA)
 end
 
 function CooldownCursor:GetValidSpellTextAnchorPositions()
-  local positions = {}
-  for k, v in pairs(SPELL_TEXT_ANCHOR_POINTS) do
-    table.insert(positions, k)
-  end
-  return positions
+  return GetTableKeys(SPELL_TEXT_ANCHOR_POINTS)
 end
 
 function CooldownCursor:GetValidCooldownTextAnchorPositions()
-  local positions = {}
-  for k, v in pairs(CD_TEXT_ANCHOR_POINTS) do
-    table.insert(positions, k)
-  end
-  return positions
+  return GetTableKeys(CD_TEXT_ANCHOR_POINTS)
 end
 
 function CooldownCursor:GetValidFontType(ftype)
+  if not ftype then return false end
   local fontType = string.upper(ftype)
   if fontType == "NONE" then return true end
-  if FONT_TYPES[fontType] then return true end
-  return false
+  return FONT_TYPES[fontType] ~= nil
 end
 
 function CooldownCursor:GetValidAnchorPosition(pos)
-  local anchor = string.upper(pos)
-  return ANCHOR_POSITION[anchor] ~= nil
+  return IsValidTableKey(ANCHOR_POSITION, pos)
 end
 
 function CooldownCursor:GetValidSpellTextAnchorPosition(pos)
-  local anchor = string.upper(pos)
-  return SPELL_TEXT_ANCHOR_POINTS[anchor] ~= nil
+  return IsValidTableKey(SPELL_TEXT_ANCHOR_POINTS, pos)
 end
 
 function CooldownCursor:GetValidCooldownTextAnchorPosition(pos)
-  local anchor = string.upper(pos)
-  return CD_TEXT_ANCHOR_POINTS[anchor] ~= nil
+  return IsValidTableKey(CD_TEXT_ANCHOR_POINTS, pos)
 end
 
 function CooldownCursor:GetValidFrameStrata(strata)
-  local fs = string.upper(strata)
-  return FRAME_STRATA[fs] ~= nil
+  return IsValidTableKey(FRAME_STRATA, strata)
 end
 
 function CooldownCursor:SetHideAfter(seconds)
@@ -1338,109 +1247,83 @@ end
 ----------------------------------------------------
 -- Live Preview API
 ----------------------------------------------------
+local function StopPreview()
+  previewActive = false
+  if previewTicker then
+    previewTicker:Cancel()
+    previewTicker = nil
+  end
+end
+
+local function StartPreviewLoop(showFunc, intervalSeconds)
+  previewActive = true
+  showFunc()
+  previewTicker = C_Timer.NewTicker(intervalSeconds, function()
+    if previewActive then
+      showFunc()
+    else
+      StopPreview()
+    end
+  end)
+end
+
 function CooldownCursor:Preview()
   if self:IsMultiIconEnabled() then
     self:PreviewMultiIcon()
     return
   end
 
-  -- Toggle off
   if previewActive then
-    previewActive = false
-    if previewTicker then
-      previewTicker:Cancel()
-      previewTicker = nil
-    end
-    CooldownCursor:HideIconNow()
+    StopPreview()
+    self:HideIconNow()
     return
   end
 
-  -- Start preview
-  previewActive = true
-
   local function ShowPreviewIcon()
-    local previewSpellID = 116
-    local previewDuration = 30
     local durationObj = C_DurationUtil.CreateDuration()
-    durationObj:SetTimeFromStart(GetTime(), previewDuration)
-    ShowSpellIcon(previewSpellID, durationObj)
-    CooldownCursor:ApplyPreviewPosition()
+    durationObj:SetTimeFromStart(GetTime(), 30)
+    ShowSpellIcon(116, durationObj) -- Frostbolt
+    self:ApplyPreviewPosition()
   end
 
-  -- Show initial icon
-  ShowPreviewIcon()
-
-  -- Loop every 30 seconds to restart the preview
-  previewTicker = C_Timer.NewTicker(30, function()
-    if previewActive then
-      ShowPreviewIcon()
-    else
-      if previewTicker then
-        previewTicker:Cancel()
-        previewTicker = nil
-      end
-    end
-  end)
+  StartPreviewLoop(ShowPreviewIcon, 30)
 end
 
+-- Preview spell pool with varying durations
+local PREVIEW_SPELL_POOL = {
+  { id = 116,   duration = 30 }, -- Frostbolt
+  { id = 133,   duration = 15 }, -- Fireball
+  { id = 11426, duration = 45 }, -- Ice Barrier
+  { id = 2136,  duration = 20 }, -- Fire Blast
+  { id = 118,   duration = 35 }, -- Polymorph
+  { id = 122,   duration = 25 }, -- Frost Nova
+  { id = 1459,  duration = 40 }, -- Arcane Intellect
+  { id = 130,   duration = 12 }, -- Slow Fall
+  { id = 475,   duration = 50 }, -- Remove Curse
+  { id = 1953,  duration = 18 }, -- Blink
+}
+
 function CooldownCursor:PreviewMultiIcon()
-  -- Toggle off
   if previewActive then
-    previewActive = false
-    if previewTicker then
-      previewTicker:Cancel()
-      previewTicker = nil
-    end
+    StopPreview()
     self:HideAllIcons(true)
     return
   end
 
-  -- Start preview
-  previewActive = true
-
-  -- Pool of different spells with varying durations
-  local spellPool = {
-    { id = 116,   duration = 30 }, -- Frostbolt
-    { id = 133,   duration = 15 }, -- Fireball
-    { id = 11426, duration = 45 }, -- Ice Barrier
-    { id = 2136,  duration = 20 }, -- Fire Blast
-    { id = 118,   duration = 35 }, -- Polymorph
-    { id = 122,   duration = 25 }, -- Frost Nova
-    { id = 1459,  duration = 40 }, -- Arcane Intellect
-    { id = 130,   duration = 12 }, -- Slow Fall
-    { id = 475,   duration = 50 }, -- Remove Curse
-    { id = 1953,  duration = 18 }, -- Blink
-  }
-
   local function ShowPreviewIcons()
-    -- Get number of icons to show based on maxIcons setting
-    local maxIcons = CooldownCursor:GetDBValue("maxIcons")
-    local numToShow = math.min(maxIcons, #spellPool)
+    local maxIcons = self:GetDBValue("maxIcons")
+    local numToShow = math.min(maxIcons, #PREVIEW_SPELL_POOL)
 
-    -- Show the specified number of preview icons
     for i = 1, numToShow do
-      local spellData = spellPool[i]
+      local spellData = PREVIEW_SPELL_POOL[i]
       local durationObj = C_DurationUtil.CreateDuration()
       durationObj:SetTimeFromStart(GetTime(), spellData.duration)
       ShowSpellIcon(spellData.id, durationObj)
     end
-    CooldownCursor:ApplyPreviewPosition()
+    self:ApplyPreviewPosition()
   end
 
-  -- Show initial icons
-  ShowPreviewIcons()
-
-  -- Loop every 50 seconds (longest cooldown) to restart the preview
-  previewTicker = C_Timer.NewTicker(50, function()
-    if previewActive then
-      ShowPreviewIcons()
-    else
-      if previewTicker then
-        previewTicker:Cancel()
-        previewTicker = nil
-      end
-    end
-  end)
+  StartPreviewLoop(ShowPreviewIcons, 50)
 end
 
 function CooldownCursor:ApplyPreviewPosition()

@@ -1150,11 +1150,6 @@ local options = {
             local values = { [0] = "|cff888888-- Select a spell --|r" }
             local spells = CooldownCursor:GetCooldownSpells(true)
 
-            -- Sort alphabetically
-            table.sort(spells, function(a, b)
-              return (a.name or ""):lower() < (b.name or ""):lower()
-            end)
-
             for _, spell in ipairs(spells) do
               if spell.spellID and spell.name then
                 -- Format: "|Ticon:size|t Spell Name (ID) [Tab]"
@@ -1168,6 +1163,21 @@ local options = {
             end
 
             return values
+          end,
+          sorting = function()
+            -- Return spellIDs sorted alphabetically by spell name
+            local spells = CooldownCursor:GetCooldownSpells(true)
+            table.sort(spells, function(a, b)
+              return (a.name or ""):lower() < (b.name or ""):lower()
+            end)
+
+            local sortedKeys = { 0 } -- "Select a spell" first
+            for _, spell in ipairs(spells) do
+              if spell.spellID then
+                table.insert(sortedKeys, spell.spellID)
+              end
+            end
+            return sortedKeys
           end,
           get = function()
             return CooldownCursor._selectedSpellbookSpell or 0

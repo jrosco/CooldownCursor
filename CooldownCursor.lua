@@ -249,6 +249,17 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
     end
   end
   ----------------------------------------------------------------------------------
+
+  ----------------------------------------------------------------------------------
+  -- migration v2.1.0 - Remove whitelist setting -----------------------------------
+  if not CooldownCursorDB._migratedWhitelist then
+    -- Remove deprecated whitelist setting from spell rules
+    if CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.settings then
+      CooldownCursorDB.spellRules.settings.whitelist = nil
+    end
+    CooldownCursorDB._migratedWhitelist = true
+  end
+  ----------------------------------------------------------------------------------
   ----------------------------------------------------------------------------------
 
   CooldownCursorDB._version = major
@@ -260,11 +271,13 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- No code execution, just messages
 
   -- breaking changes
+  table.insert(breakingChanges, "Simplified Spell Rules: Removed whitelist/blacklist mode - now uses simple enable/disable per spell (v2.1.0)")
+  table.insert(breakingChanges, "Spells must now be explicitly added to rules to show cooldowns (v2.1.0)")
   table.insert(breakingChanges, "Changed 'Show When' default from 'Always' to 'In Combat' (v2.0.0)")
   table.insert(breakingChanges, "Changed 'Anchor' default to 'Top Right' (v2.0.0)")
-  table.insert(breakingChanges,
-    "NOTE: This release is in Beta and may contain bugs. Please report any issues on the CurseForge page (v2.0.0)")
   -- new features
+  table.insert(newFeatures, "Added spellbook dropdown for easy spell rule management (v2.1.0)")
+  table.insert(newFeatures, "Moved 'Disable All Spell Rules' to Advanced tab (v2.1.0)")
   table.insert(newFeatures, "Added RADIUS, HORIZONTAL and VERTICAL display modes for multi-icon stacking (v2.0.0)")
   table.insert(newFeatures, "Added HORIZONTAL and VERTICAL stack directions (v2.0.0)")
   -- fixes

@@ -155,7 +155,6 @@ local previewTicker = nil
 ----------------------------------------------------
 local spellRules = {
   settings = {
-    whitelist = true,
     disableRules = false,
   },
   rules = {}
@@ -879,23 +878,19 @@ end
 ----------------------------------------------------
 function CooldownCursor:GetSpellRule(spellID)
   local data = CooldownCursorDB.spellRules
-  if not data or not data.rules then return true end
+  if not data or not data.rules then return false end
   if data.settings.disableRules then return true end
 
   local rules = data.rules
-  if not next(rules) then return true end
+  -- If no rules exist, don't show any spells
+  if not next(rules) then return false end
 
   local rule = rules[spellID]
+  -- If spell is not in rules, don't show it
+  if not rule then return false end
 
-  if data.settings.whitelist then
-    return rule and rule.enabled ~= false, rule
-  end
-
-  if rule and rule.enabled == false then
-    return false
-  end
-
-  return true, rule
+  -- Return whether the spell is enabled
+  return rule.enabled ~= false, rule
 end
 
 ----------------------------------------------------

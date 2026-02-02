@@ -14,7 +14,6 @@ local activeSpellID = nil
 local inCombat = false
 local fontsTable = {}
 local previewMouseMode = true
-local cachedCDSpells = {}
 
 -- Multi-icon state
 local iconPool = {}
@@ -1467,6 +1466,8 @@ end
 -- Event handler
 ----------------------------------------------------
 CooldownCursor:SetScript("OnEvent", function(self, event, ...)
+  local spellID
+  local unit
   if event == "ADDON_LOADED" then
     local name = ...
     if name ~= addonName then return end
@@ -1477,7 +1478,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     self:UnregisterEvent("ADDON_LOADED")
     return
   end
-
   if event == "PLAYER_REGEN_DISABLED" then
     inCombat = true
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT then
@@ -1498,8 +1498,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       or event == "UNIT_SPELLCAST_SENT"
       or event == "UNIT_SPELLCAST_SUCCEEDED"
       or event == "SPELL_UPDATE_COOLDOWN" then
-    local spellID
-    local unit
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
       return
     end
@@ -1513,42 +1511,58 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
 
     -- SPELL_UPDATE_COOLDOWN will update cooldown
-    -- that buffs, talents or items may cause.
+    -- that buffs, talents or items may trigger new updated CD times.
     if event == "SPELL_UPDATE_COOLDOWN" then
       spellID, _, _, _ = ...
     else
       unit, _, spellID = ...
-      -- Cache spellID that are not SPELL_UPDATE_COOLDOWN events
-      -- This allows only tracking spells that have triggered the icon display
-      if not IsSecretValue(spellID) and type(spellID) == "number" then table.insert(cachedCDSpells, spellID, true) end
       if unit ~= "player" then return end
     end
-    if not spellID or not cachedCDSpells[spellID] then return end
+    if not spellID then return end
+
+    local cd = C_Spell.GetSpellCooldown(spellID)
+
+    -- Quick checks: existence and GCD
+    if not cd or cd.isOnGCD then
+      return
+    end
+
+    -- Filter out non-cooldown abilities (buffs, mounts, etc.)
+    -- Abilities with no real cooldown have startTime == 0
+    -- IsSecretValue protects against taint in combat
+    -- Check spells are known to player
+    if not IsSecretValue(cd.startTime) and cd.startTime == 0 then return end
+    if not IsPlayerSpell(spellID) then return end
+
+    local usable = C_Spell.IsSpellUsable(spellID)
+    local inRange = C_Spell.IsSpellInRange(spellID)
+
+    -- Check spell usability
+    if usable == false or inRange == false then return end
+
+    -- Check user spell rules
+    local show, rule = CooldownCursor:GetSpellRule(spellID)
+    if not show then return end
+    if IsSecretValue(spellID) and not type(spellID) == "number" then return end
 
     -- Delay slightly to allow cooldown to register
-    C_Timer.After(0.05, function()
-      local cd = C_Spell.GetSpellCooldown(spellID)
+    C_Timer.After(0.1, function()
+      -- First, handle the triggering spell
       local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
+      if durationObject then
+        ShowSpellIcon(spellID, durationObject)
+      end
 
-      -- Quick checks: existence and GCD
-      if not cd or cd.isOnGCD or not durationObject then return end
-
-      -- Filter out non-cooldown abilities (buffs, mounts, etc.)
-      -- Abilities with no real cooldown have startTime == 0
-      -- IsSecretValue protects against taint in combat
-      if not IsSecretValue(cd.startTime) and cd.startTime == 0 then return end
-
-      local usable = C_Spell.IsSpellUsable(spellID)
-      local inRange = C_Spell.IsSpellInRange(spellID)
-
-      -- Check spell usability
-      if usable == false or inRange == false then return end
-
-      -- Check user spell rules
-      local show, rule = CooldownCursor:GetSpellRule(spellID)
-      if not show then return end
-
-      ShowSpellIcon(spellID, durationObject)
+      -- Then refresh ALL currently-shown icons in case a buff/talent changed their CDs
+      for activeSpellID, iconData in pairs(activeIcons) do
+        if activeSpellID ~= spellID then -- already handled above
+          local activeDuration = C_Spell.GetSpellCooldownDuration(activeSpellID)
+          if activeDuration and iconData.iconFrame then
+            iconData.iconFrame.cooldown:SetCooldownFromDurationObject(activeDuration)
+            iconData.durationObject = activeDuration
+          end
+        end
+      end
     end)
   end
 end)

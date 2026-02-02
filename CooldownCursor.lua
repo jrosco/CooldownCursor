@@ -160,10 +160,10 @@ local defaults = {
   spellRules = spellRules,
 
   -- Multiple Icon Display Settings
-  maxIcons = 5,
+  maxIcons = 10,
   stackDirection = STACK_DIRECTION.HORIZONTAL,
   stackSpacing = 4,
-  sortOrder = SORT_ORDER.PRIORITY,
+  sortOrder = SORT_ORDER.TIME_ADDED,
   stackGrowth = STACK_GROWTH.RIGHT,
   iconPoolSize = 10,
   radiusDistance = 80,

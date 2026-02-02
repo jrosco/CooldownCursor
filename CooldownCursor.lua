@@ -1430,7 +1430,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     if IsSecretValue(spellID) and not type(spellID) == "number" then return end
 
     -- Delay slightly to allow cooldown to register
-    C_Timer.After(0.1, function()
+    C_Timer.After(0.05, function()
       -- First, handle the triggering spell
       local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
       if durationObject then

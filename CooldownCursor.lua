@@ -236,6 +236,7 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   table.insert(fixes, "Fixed SPELL_UPDATE_COOLDOWN not triggering spells with CD Buff updates (v2.0.0)")
   table.insert(fixes, "Fixed Masque skin/style when showing multiple icon display (v2.0.1)")
   table.insert(fixes, "Fixed Minor bug fixes (v2.0.3)")
+  table.insert(fixes, "Improved cooldown accuracy: all active icons now refresh when buffs/talents affect multiple cooldowns (v2.0.4)")
 
   -- Store for Options.lua to display
   self.releaseNotes = {

@@ -2,12 +2,13 @@
 ## Title: CooldownCursor
 ## Notes: Shows cooldown timers at your cursor position
 ## Author: jrosco
-## Version: 2.0.4
+## Version: 2.1.0
 ## SavedVariables: CooldownCursorDB
 ## OptionalDeps: Masque
 
 embeds.xml
 
+Spells.lua
 CooldownCursor.lua
 Options.lua
 Slash.lua

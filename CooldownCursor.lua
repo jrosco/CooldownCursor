@@ -1347,6 +1347,30 @@ function CooldownCursor:ApplyPreviewPosition()
 end
 
 ----------------------------------------------------
+-- Spells Module Proxy Methods
+-- Access the Spells module via addonTable.Spells
+----------------------------------------------------
+function CooldownCursor:GetAllSpellBookSpells(includePetSpells, includeFutureSpells, forceRefresh)
+  return addonTable.Spells:GetAllSpellBookSpells(includePetSpells, includeFutureSpells, forceRefresh)
+end
+
+function CooldownCursor:GetCooldownSpells(includePetSpells)
+  return addonTable.Spells:GetCooldownSpells(includePetSpells)
+end
+
+function CooldownCursor:GetSpellBookByID(includePetSpells, includeFutureSpells)
+  return addonTable.Spells:GetSpellBookByID(includePetSpells, includeFutureSpells)
+end
+
+function CooldownCursor:InvalidateSpellBookCache()
+  return addonTable.Spells:InvalidateSpellBookCache()
+end
+
+function CooldownCursor:GetSpellTypeName(enumValue)
+  return addonTable.Spells:GetSpellTypeName(enumValue)
+end
+
+----------------------------------------------------
 -- Event handler
 ----------------------------------------------------
 CooldownCursor:SetScript("OnEvent", function(self, event, ...)

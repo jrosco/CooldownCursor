@@ -1129,20 +1129,125 @@ local options = {
 
         header = {
           type = "header",
-          name = "Spell Rule Editor",
+          name = "Add from Spellbook",
           order = 415,
         },
 
         description = {
           type = "description",
-          name = "Add or update a spell rule by entering its numeric Spell ID below.",
+          name = "Select a spell from your spellbook to add it as a rule, or manually enter a Spell ID below.",
           order = 416,
+        },
+
+        spellbookDropdown = {
+          type = "select",
+          name = "Select Spell",
+          desc = "Choose a spell from your spellbook with a cooldown.\n\n" ..
+              "|cffaaaaaaTip: This list shows all your active spells that have cooldowns.|r",
+          order = 417,
+          width = "double",
+          values = function()
+            local values = { [0] = "|cff888888-- Select a spell --|r" }
+            local spells = CooldownCursor:GetCooldownSpells(true)
+
+            -- Sort alphabetically
+            table.sort(spells, function(a, b)
+              return (a.name or ""):lower() < (b.name or ""):lower()
+            end)
+
+            for _, spell in ipairs(spells) do
+              if spell.spellID and spell.name then
+                -- Format: "|Ticon:size|t Spell Name (ID) [Tab]"
+                local icon = spell.iconID and string.format("|T%d:14:14:0:0|t ", spell.iconID) or ""
+                local label = string.format("%s%s |cff888888(%d)|r", icon, spell.name, spell.spellID)
+                if spell.tabName then
+                  label = label .. string.format(" |cff666666[%s]|r", spell.tabName)
+                end
+                values[spell.spellID] = label
+              end
+            end
+
+            return values
+          end,
+          get = function()
+            return CooldownCursor._selectedSpellbookSpell or 0
+          end,
+          set = function(_, v)
+            CooldownCursor._selectedSpellbookSpell = v
+            if v and v > 0 then
+              -- Auto-fill the spell ID input
+              CooldownCursor._newRuleSpellID = v
+              CooldownCursor._spellRuleStatusText = nil
+              CooldownCursor:NotifyOptionsChanged()
+            end
+          end,
+        },
+
+        addFromSpellbook = {
+          type = "execute",
+          name = "Add",
+          desc = "Add the selected spell to your rules.\n\n" ..
+              "|cffaaaaaaTip: Select a spell from the dropdown first.|r",
+          order = 418,
+          width = "half",
+          func = function()
+            local spellID = CooldownCursor._selectedSpellbookSpell
+            if not spellID or spellID == 0 then
+              CooldownCursor._spellRuleStatusText = "Please select a spell first"
+              CooldownCursor._spellRuleStatusColor = "ff5555"
+              CooldownCursor:NotifyOptionsChanged()
+              return
+            end
+
+            local info = C_Spell.GetSpellInfo(spellID)
+            if not info then
+              CooldownCursor._spellRuleStatusText = "Spell not found"
+              CooldownCursor._spellRuleStatusColor = "ff5555"
+              CooldownCursor:NotifyOptionsChanged()
+              return
+            end
+
+            -- Add rule with default settings
+            CooldownCursor:AddOrUpdateSpellRule(spellID, {
+              enabled = CooldownCursorDB.spellRules.settings.whitelist ~= false,
+              priority = 0,
+            })
+
+            CooldownCursor._spellRuleStatusText =
+                ("Added: %s (%d)"):format(info.name, spellID)
+            CooldownCursor._spellRuleStatusColor = "55ff55"
+
+            -- Reset selection
+            CooldownCursor._selectedSpellbookSpell = 0
+
+            CooldownCursor:RebuildSpellRuleOptions()
+            CooldownCursor:NotifyOptionsChanged()
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
+        spacer1 = {
+          type = "description",
+          name = " ",
+          order = 419,
+        },
+
+        manualHeader = {
+          type = "header",
+          name = "Edit Mode",
+          order = 420,
+        },
+
+        manualDescription = {
+          type = "description",
+          name = "Or enter a spell ID manually:",
+          order = 420.5,
         },
 
         spacer = {
           type = "description",
           name = " ",
-          order = 420,
+          order = 420.6,
         },
 
         spellID = {
@@ -1212,7 +1317,7 @@ local options = {
 
         add = {
           type = "execute",
-          name = "Add / Update Spell Rule",
+          name = "Add / Update",
           order = 425,
           func = function()
             local spellID = CooldownCursor._newRuleSpellID
@@ -1266,6 +1371,26 @@ local options = {
             )
           end,
           order = 424.5,
+        },
+
+        spellbookHeader = {
+          type = "header",
+          name = "",
+          order = 500,
+        },
+
+        refreshSpellbook = {
+          type = "execute",
+          name = "Refresh Spellbook",
+          desc = "Refresh the spellbook list.\n\n" ..
+              "|cffaaaaaaTip: Use this after changing talents or specialization.|r",
+          order = 510,
+          func = function()
+            CooldownCursor:InvalidateSpellBookCache()
+            CooldownCursor._spellRuleStatusText = "Spellbook refreshed!"
+            CooldownCursor._spellRuleStatusColor = "55ff55"
+            CooldownCursor:NotifyOptionsChanged()
+          end,
         },
       },
     },
@@ -1342,6 +1467,23 @@ local options = {
           order = 60,
           confirm = true,
           func = function() CooldownCursor:ResetSettings() end,
+        },
+
+        clearAllSpellRules = {
+          type = "execute",
+          name = "Clear All Spell Rules",
+          desc = "Remove all spell rules you have added.\n\n" ..
+              "|cffff8800Warning:|r This cannot be undone!",
+          order = 70,
+          confirm = true,
+          confirmText = "Are you sure you want to delete ALL spell rules? This cannot be undone.",
+          func = function()
+            CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or {}
+            CooldownCursorDB.spellRules.rules = {}
+            CooldownCursor:RebuildSpellRuleOptions()
+            CooldownCursor:NotifyOptionsChanged()
+            CooldownCursor:UpdateDisplay()
+          end,
         },
       },
     },

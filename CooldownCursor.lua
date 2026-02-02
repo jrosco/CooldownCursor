@@ -6,6 +6,42 @@ local CooldownCursor = CreateFrame("Frame")
 addonTable.Frame = CooldownCursor
 
 ----------------------------------------------------
+-- Module System (Metatable Delegation)
+-- Modules register in addonTable.Modules and their
+-- methods become available on CooldownCursor
+----------------------------------------------------
+addonTable.Modules = addonTable.Modules or {}
+
+-- Preserve the original Frame metatable
+local originalMT = getmetatable(CooldownCursor)
+local originalIndex = originalMT and originalMT.__index
+
+setmetatable(CooldownCursor, {
+  __index = function(self, key)
+    -- First, check the original Frame methods
+    if originalIndex then
+      local value
+      if type(originalIndex) == "function" then
+        value = originalIndex(self, key)
+      elseif type(originalIndex) == "table" then
+        value = originalIndex[key]
+      end
+      if value ~= nil then
+        return value
+      end
+    end
+
+    -- Then search registered modules for the method
+    for _, module in pairs(addonTable.Modules) do
+      if module[key] then
+        return module[key]
+      end
+    end
+    return nil
+  end
+})
+
+----------------------------------------------------
 -- Runtime state
 ----------------------------------------------------
 local lastSpellId = nil
@@ -1344,30 +1380,6 @@ function CooldownCursor:ApplyPreviewPosition()
       icon:SetPoint("LEFT", anchor, "RIGHT", 8, 0)
     end
   end
-end
-
-----------------------------------------------------
--- Spells Module Proxy Methods
--- Access the Spells module via addonTable.Spells
-----------------------------------------------------
-function CooldownCursor:GetAllSpellBookSpells(includePetSpells, includeFutureSpells, forceRefresh)
-  return addonTable.Spells:GetAllSpellBookSpells(includePetSpells, includeFutureSpells, forceRefresh)
-end
-
-function CooldownCursor:GetCooldownSpells(includePetSpells)
-  return addonTable.Spells:GetCooldownSpells(includePetSpells)
-end
-
-function CooldownCursor:GetSpellBookByID(includePetSpells, includeFutureSpells)
-  return addonTable.Spells:GetSpellBookByID(includePetSpells, includeFutureSpells)
-end
-
-function CooldownCursor:InvalidateSpellBookCache()
-  return addonTable.Spells:InvalidateSpellBookCache()
-end
-
-function CooldownCursor:GetSpellTypeName(enumValue)
-  return addonTable.Spells:GetSpellTypeName(enumValue)
 end
 
 ----------------------------------------------------

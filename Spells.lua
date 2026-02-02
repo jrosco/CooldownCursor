@@ -244,3 +244,16 @@ end
 function Spells:GetSpellTypeName(enumValue)
   return SpellBookItemTypeNames[enumValue] or "Unknown"
 end
+
+----------------------------------------------------
+-- Register Module
+-- This makes Spells methods available via CooldownCursor
+--
+-- Usage:
+--   local spells = CooldownCursor:GetCooldownSpells(true)
+--   local allSpells = CooldownCursor:GetAllSpellBookSpells(false, false, false)
+--   local spellLookup = CooldownCursor:GetSpellBookByID(false, false)
+--   CooldownCursor:InvalidateSpellBookCache()
+----------------------------------------------------
+addonTable.Modules = addonTable.Modules or {}
+addonTable.Modules.Spells = Spells

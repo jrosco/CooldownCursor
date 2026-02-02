@@ -14,7 +14,6 @@ local activeSpellID = nil
 local inCombat = false
 local fontsTable = {}
 local previewMouseMode = true
-local cachedCDSpells = {}
 
 -- Multi-icon state
 local iconPool = {}
@@ -244,6 +243,10 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   table.insert(fixes, "Fixed SPELL_UPDATE_COOLDOWN not triggering spells with CD Buff updates (v2.0.0)")
   table.insert(fixes, "Fixed Masque skin/style when showing multiple icon display (v2.0.1)")
   table.insert(fixes, "Fixed Minor bug fixes (v2.0.3)")
+  table.insert(fixes,
+    "Fixed ON_COOLDOWN mode: icons now remove instantly when cooldown ends instead of waiting 1-2s (v2.0.4)")
+  table.insert(fixes,
+    "Improved cooldown accuracy: all active icons now refresh when buffs/talents affect multiple cooldowns (v2.0.4)")
 
   -- Store for Options.lua to display
   self.releaseNotes = {
@@ -1653,12 +1656,9 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       spellID, _, _, _ = ...
     else
       unit, _, spellID = ...
-      -- Cache spellID that are not SPELL_UPDATE_COOLDOWN events
-      -- This allows only tracking spells that have triggered the icon display
-      if not IsSecretValue(spellID) and type(spellID) == "number" then table.insert(cachedCDSpells, spellID, true) end
       if unit ~= "player" then return end
     end
-    if not spellID or not cachedCDSpells[spellID] then return end
+    if not spellID then return end
 
 
     -- Delay slightly to allow cooldown to register
@@ -1669,10 +1669,22 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       -- Quick checks: existence and GCD
       if not cd or cd.isOnGCD or not durationObject then return end
 
-      -- Filter out non-cooldown abilities (buffs, mounts, etc.)
-      -- Abilities with no real cooldown have startTime == 0
-      -- IsSecretValue protects against taint in combat
-      if not IsSecretValue(cd.startTime) and cd.startTime == 0 then return end
+      -- Filter out non-cooldown abilities (buffs, mounts, etc.).
+      -- Abilities with no real cooldown have startTime == 0.
+      -- BUT: a cooldown ending also sets startTime to 0. If we're already
+      -- tracking this spell, that's the "CD just ended" signal - run the
+      -- removal check immediately instead of bailing out and waiting for
+      -- SPELL_UPDATE_USABLE (which can lag 1-2s).
+      -- IsSecretValue protects against taint in combat.
+      if not IsSecretValue(cd.startTime) and cd.startTime == 0 then
+        if activeIcons[spellID] then
+          ApplyShowBehavior()
+        end
+        return
+      end
+
+      -- Check spell is known to player
+      if not IsPlayerSpell(spellID) then return end
 
       local usable = C_Spell.IsSpellUsable(spellID)
       local inRange = C_Spell.IsSpellInRange(spellID)
@@ -1688,6 +1700,19 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       if not show then return end
 
       ShowSpellIcon(spellID, durationObject)
+
+      -- Refresh all other currently-shown icons in case a buff/talent changed their CDs
+      -- (e.g., haste buff or Avenging Wrath reducing all cooldowns)
+      for activeSpellID, iconData in pairs(activeIcons) do
+        if activeSpellID ~= spellID then -- already handled above
+          local activeDuration = C_Spell.GetSpellCooldownDuration(activeSpellID)
+          if activeDuration and iconData.iconFrame then
+            iconData.iconFrame.cooldown:SetCooldownFromDurationObject(activeDuration)
+            iconData.durationObject = activeDuration
+          end
+        end
+      end
+
       ApplyShowBehavior()
     end)
   end

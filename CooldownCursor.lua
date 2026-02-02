@@ -1475,6 +1475,13 @@ end
 CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   local spellID
   local unit
+  local SPELL_EVENTS = {
+    UNIT_SPELLCAST_FAILED = true,
+    UNIT_SPELLCAST_SENT = true,
+    UNIT_SPELLCAST_SUCCEEDED = true,
+    SPELL_UPDATE_COOLDOWN = true,
+    SPELL_UPDATE_USABLE = true,
+  }
   if event == "ADDON_LOADED" then
     local name = ...
     if name ~= addonName then return end
@@ -1513,10 +1520,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
-  if event == "UNIT_SPELLCAST_FAILED"
-      or event == "UNIT_SPELLCAST_SENT"
-      or event == "UNIT_SPELLCAST_SUCCEEDED"
-      or event == "SPELL_UPDATE_COOLDOWN" then
+  if SPELL_EVENTS[event] then
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
       return
     end
@@ -1539,57 +1543,23 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
     if not spellID then return end
 
-    local cd = C_Spell.GetSpellCooldown(spellID)
-
-    -- Quick checks: existence and GCD
-    if not cd or cd.isOnGCD then
-      return
+    if activeIcons[spellID] then
+      ApplyShowBehavior()
     end
-
-    -- Filter out non-cooldown abilities (buffs, mounts, etc.)
-    -- Abilities with no real cooldown have startTime == 0
-    -- IsSecretValue protects against taint in combat
-    -- Check spells are known to player
-    if not IsSecretValue(cd.startTime) and cd.startTime == 0 then return end
-    if not IsPlayerSpell(spellID) then return end
-
-    local usable = C_Spell.IsSpellUsable(spellID)
-    local inRange = C_Spell.IsSpellInRange(spellID)
-
-    -- Check spell usability
-    if usable == false or inRange == false then return end
-
-    -- Check user spell rules
-    local show, rule = CooldownCursor:GetSpellRule(spellID)
-    if not show then return end
-    if IsSecretValue(spellID) and not type(spellID) == "number" then return end
 
     -- Delay slightly to allow cooldown to register
     C_Timer.After(0.05, function()
-      -- First, handle the triggering spell
-      local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
-      if durationObject then
-        ShowSpellIcon(spellID, durationObject)
-      end
+      local durationObj = C_Spell.GetSpellCooldownDuration(spellID)
 
-      -- Quick checks: existence and GCD
-      if not cd or cd.isOnGCD or not durationObject then return end
+      if not durationObj then return end
 
       -- Filter out non-cooldown abilities (buffs, mounts, etc.).
-      -- Abilities with no real cooldown have startTime == 0.
-      -- BUT: a cooldown ending also sets startTime to 0. If we're already
-      -- tracking this spell, that's the "CD just ended" signal - run the
-      -- removal check immediately instead of bailing out and waiting for
-      -- SPELL_UPDATE_USABLE (which can lag 1-2s).
-      -- IsSecretValue protects against taint in combat.
-      if not IsSecretValue(cd.startTime) and cd.startTime == 0 then
-        if activeIcons[spellID] then
-          ApplyShowBehavior()
-        end
+      if durationObj and not durationObj:HasSecretValues()
+          and durationObj:GetStartTime() == 0 then
         return
       end
 
-      -- Check spell is known to player
+      -- Check spells are known to player
       if not IsPlayerSpell(spellID) then return end
 
       local usable = C_Spell.IsSpellUsable(spellID)
@@ -1604,20 +1574,8 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       -- Check user spell rules
       local show, rule = CooldownCursor:GetSpellRule(spellID)
       if not show then return end
-
-      ShowSpellIcon(spellID, durationObject)
-
-      -- Refresh all other currently-shown icons in case a buff/talent changed their CDs
-      -- (e.g., haste buff or Avenging Wrath reducing all cooldowns)
-      -- Then refresh ALL currently-shown icons in case a buff/talent changed their CDs
-      for activeSpellID, iconData in pairs(activeIcons) do
-        if activeSpellID ~= spellID then -- already handled above
-          local activeDuration = C_Spell.GetSpellCooldownDuration(activeSpellID)
-          if activeDuration and iconData.iconFrame then
-            iconData.iconFrame.cooldown:SetCooldownFromDurationObject(activeDuration)
-            iconData.durationObject = activeDuration
-          end
-        end
+      if durationObj then
+        ShowSpellIcon(spellID, durationObj)
       end
       ApplyShowBehavior()
     end)

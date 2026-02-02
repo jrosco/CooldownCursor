@@ -1574,9 +1574,11 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       -- Check user spell rules
       local show, rule = CooldownCursor:GetSpellRule(spellID)
       if not show then return end
+
       if durationObj then
         ShowSpellIcon(spellID, durationObj)
       end
+      
       ApplyShowBehavior()
     end)
   end

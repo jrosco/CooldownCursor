@@ -241,6 +241,24 @@ local function ShowWhenValues()
   }
 end
 
+-- Helper to set smart defaults when Display Mode changes
+local function ApplyDisplayModeDefaults(newMode)
+  if newMode == "HORIZONTAL" then
+    -- Default to RIGHT growth with TOPRIGHT anchor
+    CooldownCursorDB.stackGrowth = "RIGHT"
+    CooldownCursorDB.anchor = "TOPRIGHT"
+  elseif newMode == "VERTICAL" then
+    -- Default to DOWN growth with BOTTOM anchor
+    CooldownCursorDB.stackGrowth = "DOWN"
+    CooldownCursorDB.anchor = "BOTTOM"
+  elseif newMode == "RADIUS" then
+    -- Default to CLOCKWISE growth with CENTER anchor
+    CooldownCursorDB.stackGrowth = "CLOCKWISE"
+    CooldownCursorDB.anchor = "CENTER"
+  end
+  -- SINGLE mode: no automatic changes
+end
+
 local function HexColorGet(key, fallbackHex)
   -- AceConfig color expects r,g,b,a in 0..1
   local hex = (CooldownCursor:GetDBValue(key) or fallbackHex or "ffffff"):gsub("#", "")
@@ -370,6 +388,7 @@ local options = {
             return CooldownCursor:GetDBValue("stackDirection")
           end,
           set = function(_, v)
+            ApplyDisplayModeDefaults(v)
             CooldownCursor:SetDBString("stackDirection", v)
           end,
         },
@@ -757,6 +776,7 @@ local options = {
             return CooldownCursor:GetDBValue("stackDirection")
           end,
           set = function(_, v)
+            ApplyDisplayModeDefaults(v)
             CooldownCursor:SetDBString("stackDirection", v)
           end,
         },

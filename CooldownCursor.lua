@@ -281,6 +281,8 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
       newFeatures = {
         "Added ability to completely disable the addon from Quick Settings",
         "Added spellbook dropdown for easy spell rule management",
+        "Added primary icon indicator in RADIUS preview mode",
+        "Display Mode now auto-sets anchor and growth direction defaults",
         "Moved 'Disable All Spell Rules' to Advanced tab",
       },
       fixes = {},
@@ -398,6 +400,19 @@ local function CreateIconFrame(index)
     ReturnIconToPool(iconFrame)
   end)
 
+  -- Primary icon indicator border (for preview mode)
+  iconFrame.primaryBorder = iconFrame:CreateTexture(nil, "OVERLAY")
+  iconFrame.primaryBorder:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", -3, 3)
+  iconFrame.primaryBorder:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", 3, -3)
+  iconFrame.primaryBorder:SetColorTexture(0, 1, 0, 0.8) -- Green border
+  iconFrame.primaryBorder:Hide()
+
+  -- Primary label text
+  iconFrame.primaryLabel = iconFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  iconFrame.primaryLabel:SetPoint("BOTTOM", iconFrame, "TOP", 0, 6)
+  iconFrame.primaryLabel:SetText("|cff00ff00PRIMARY|r")
+  iconFrame.primaryLabel:Hide()
+
   iconFrame.iconID = index
   iconFrame.spellID = nil
   iconFrame.addedTime = nil
@@ -439,6 +454,14 @@ function ReturnIconToPool(iconFrame)
   iconFrame.priority = 0
   iconFrame.stackOffsetX = 0
   iconFrame.stackOffsetY = 0
+
+  -- Hide primary indicator
+  if iconFrame.primaryBorder then
+    iconFrame.primaryBorder:Hide()
+  end
+  if iconFrame.primaryLabel then
+    iconFrame.primaryLabel:Hide()
+  end
 
   if iconFrame.hideTimer then
     iconFrame.hideTimer:Cancel()
@@ -1429,9 +1452,20 @@ end
 function CooldownCursor:ApplyPreviewPosition()
   if not previewActive then return end
 
+  local isRadius = (CooldownCursorDB.stackDirection or defaults.stackDirection) == "RADIUS"
+
   if previewMouseMode then
-    for _, iconData in ipairs(iconsByPriority) do
+    for i, iconData in ipairs(iconsByPriority) do
       iconData.iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
+
+      -- Show primary indicator on first icon in RADIUS mode
+      if isRadius and i == 1 then
+        iconData.iconFrame.primaryBorder:Show()
+        iconData.iconFrame.primaryLabel:Show()
+      else
+        iconData.iconFrame.primaryBorder:Hide()
+        iconData.iconFrame.primaryLabel:Hide()
+      end
     end
   else
     for _, iconData in ipairs(iconsByPriority) do
@@ -1441,6 +1475,10 @@ function CooldownCursor:ApplyPreviewPosition()
       icon:ClearAllPoints()
       local anchor = SettingsPanel or UIParent
       icon:SetPoint("LEFT", anchor, "RIGHT", 8, 0)
+
+      -- Hide primary indicator when not following mouse
+      icon.primaryBorder:Hide()
+      icon.primaryLabel:Hide()
     end
   end
 end

@@ -1170,6 +1170,11 @@ local function ApplyShowBehavior()
     if iconFrame then
       local isOnCooldown = iconFrame.cooldown:IsShown()
 
+      -- Reset alpha in case it was modified in OFF_COOLDOWN mode
+      if isOnCooldown then
+        iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+      end
+
       if showBehavior == SHOW_BEHAVIOR.ON_COOLDOWN then
         -- ON_COOLDOWN: icon should only be visible while on cooldown.
         -- Mark for removal once the cooldown ends.
@@ -1726,7 +1731,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
 
     -- Delay slightly to allow cooldown to register
-    C_Timer.After(0.05, function()
+    C_Timer.After(0.01, function()
       local durationObj = C_Spell.GetSpellCooldownDuration(spellID)
 
       if not durationObj then return end
@@ -1740,11 +1745,11 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       -- Check spells are known to player
       if not IsPlayerSpell(spellID) then return end
 
-      local usable = C_Spell.IsSpellUsable(spellID)
+      -- local usable = C_Spell.IsSpellUsable(spellID)
       local inRange = C_Spell.IsSpellInRange(spellID)
 
       -- Check spell usability
-      if (usable == false or inRange == false) and
+      if inRange == false and
           CooldownCursorDB.showBehavior ~= SHOW_BEHAVIOR.OFF_COOLDOWN then
         return
       end
@@ -1756,7 +1761,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       if durationObj then
         ShowSpellIcon(spellID, durationObj)
       end
-      
+
       ApplyShowBehavior()
     end)
   end

@@ -15,6 +15,9 @@ local fontValues = {}
 local anchorValues = {}
 local frameStrataValues = {}
 
+-- Debounce timer for priority slider rebuild
+local priorityRebuildTimer = nil
+
 local fontTypeValues = {
   NONE = "None",
   OUTLINE = "Outline",
@@ -66,8 +69,25 @@ function CooldownCursor:RebuildSpellRuleOptions()
     end
   end
 
-  -- Sort alphabetically (case-insensitive)
+  -- Sort by priority (higher first), then alphabetically for priority 0
   table.sort(sorted, function(a, b)
+    local aPriority = a.rule.priority or 0
+    local bPriority = b.rule.priority or 0
+
+    -- Spells with priority > 0 come before priority 0
+    if aPriority > 0 and bPriority == 0 then
+      return true
+    end
+    if bPriority > 0 and aPriority == 0 then
+      return false
+    end
+
+    -- Both have priority: sort by priority descending (higher first)
+    if aPriority > 0 and bPriority > 0 then
+      return aPriority > bPriority
+    end
+
+    -- Both priority 0: sort alphabetically
     return a.name:lower() < b.name:lower()
   end)
 
@@ -80,8 +100,10 @@ function CooldownCursor:RebuildSpellRuleOptions()
     local name = entry.name
     local enabled = rule.enabled
     local icon = entry.icon
+    local priority = rule.priority or 0
     local color, suffix = GetRuleDisplayColor(enabled)
-    name = ("|cff%s%s %s|r"):format(color, name, suffix)
+    local priorityText = priority > 0 and ("|cffaaaaaa[%d]|r "):format(priority) or ""
+    name = ("%s|cff%s%s %s|r"):format(priorityText, color, name, suffix)
 
     args["spell_" .. spellID] = {
       type = "group",
@@ -125,7 +147,15 @@ function CooldownCursor:RebuildSpellRuleOptions()
           set = function(_, v)
             rule.priority = v
             self:UpdateDisplay()
-            self:NotifyOptionsChanged()
+            -- Debounce the rebuild so slider moves smoothly
+            if priorityRebuildTimer then
+              priorityRebuildTimer:Cancel()
+            end
+            priorityRebuildTimer = C_Timer.NewTimer(0.3, function()
+              self:RebuildSpellRuleOptions()
+              self:NotifyOptionsChanged()
+              priorityRebuildTimer = nil
+            end)
           end,
         },
 

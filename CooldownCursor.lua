@@ -1091,6 +1091,11 @@ end
 -- Show icon + cooldown
 ----------------------------------------------------
 local function ShowSpellIcon(spellID, durationObject)
+  -- Don't create icons if addon is disabled
+  if CooldownCursorDB.enabled == false then
+    return
+  end
+
   local spellInfo = C_Spell.GetSpellInfo(spellID)
   if not spellInfo or not spellInfo.iconID then return end
 
@@ -1142,6 +1147,11 @@ end
 -- ON_COOLDOWN:     removes icons whose cooldown has ended.
 -- OFF_COOLDOWN:    seeds icons from rules, then hides/shows based on cooldown state.
 local function ApplyShowBehavior()
+  -- Don't do anything if addon is disabled
+  if CooldownCursorDB.enabled == false then
+    return
+  end
+
   local showBehavior = CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
 
   -- AUTO_HIDE_AFTER - nothing extra to do here

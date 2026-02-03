@@ -1552,6 +1552,17 @@ local options = {
             CooldownCursor:NotifyOptionsChanged()
           end,
         },
+
+        disableRulesWarning = {
+          type = "description",
+          name = function()
+            if CooldownCursorDB.spellRules.settings.disableRules then
+              return "|cffff5555Spell rules are currently DISABLED.|r All spells will show cooldowns."
+            end
+            return ""
+          end,
+          order = 91,
+        },
       },
     },
 

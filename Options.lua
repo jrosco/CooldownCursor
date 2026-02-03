@@ -1225,7 +1225,30 @@ local options = {
 
         manualDescription = {
           type = "description",
-          name = "Or enter a spell ID manually:",
+          name = function()
+            local spellID = CooldownCursor._newRuleSpellID
+            if spellID and spellID > 0 then
+              local info = C_Spell.GetSpellInfo(spellID)
+              if info then
+                local icon = info.iconID and string.format("|T%d:20:20:0:0|t ", info.iconID) or ""
+                local baseCooldownMS = GetSpellBaseCooldown(spellID)
+                local baseCooldown = baseCooldownMS and (baseCooldownMS / 1000) or 0
+
+                local details = string.format(
+                  "%s|cff00ff00%s|r  |cff888888(ID: %d)|r\n" ..
+                  "Base Cooldown: |cffffffff%s|r",
+                  icon,
+                  info.name,
+                  spellID,
+                  baseCooldown > 0 and string.format("%.1fs", baseCooldown) or "None"
+                )
+                return details
+              else
+                return "|cffff5555Spell not found.|r Enter a valid Spell ID."
+              end
+            end
+            return "Select a spell from the dropdown above, or enter a Spell ID manually."
+          end,
           order = 420.5,
         },
 
@@ -1248,6 +1271,7 @@ local options = {
           set = function(_, value)
             local id = tonumber(value)
             CooldownCursor._newRuleSpellID = id
+            CooldownCursor:NotifyOptionsChanged()
           end,
         },
 

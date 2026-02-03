@@ -25,22 +25,14 @@ local fontTypeValues = {
 }
 
 local function GetRuleDisplayColor(enabled)
-  local whitelistSuffix = ""
-  local blacklistSuffix = ""
   if CooldownCursorDB.spellRules.settings.disableRules then
-    return "9d9d9d", "(disabled)"
+    return "9d9d9d", "(rules disabled)"
   end
 
-  if CooldownCursorDB.spellRules.settings.whitelist then
-    whitelistSuffix = "(*)"
-  end
-  if not CooldownCursorDB.spellRules.settings.whitelist then
-    blacklistSuffix = "(*)"
-  end
   if enabled == nil then return "ffff00", "" end
-  if enabled then return "00ff00", whitelistSuffix end
+  if enabled then return "00ff00", "" end
 
-  return "ff5555", blacklistSuffix
+  return "ff5555", "(disabled)"
 end
 
 function CooldownCursor:RebuildSpellRuleOptions()
@@ -101,10 +93,9 @@ function CooldownCursor:RebuildSpellRuleOptions()
       args = {
 
         enabled = {
-          type = "select",
-          name = "Rule Type",
-          desc = "Whitelist (show spell) or Blacklist (hide spell).",
-          values = { [true] = "Whitelist", [false] = "Blacklist" },
+          type = "toggle",
+          name = "Enabled",
+          desc = "When enabled, this spell will show cooldowns at your cursor.",
           order = 10,
           get = function() return rule.enabled ~= false end,
           set = function(_, v)
@@ -126,7 +117,7 @@ function CooldownCursor:RebuildSpellRuleOptions()
           disabled = function()
             return CooldownCursor:GetDBValue("stackDirection") == "SINGLE" or
                 CooldownCursorDB.spellRules.settings.disableRules or
-                rule.enabled == false
+                not rule.enabled
           end,
           get = function()
             return rule.priority or 0
@@ -158,7 +149,7 @@ function CooldownCursor:RebuildSpellRuleOptions()
           max = 128,
           step = 1,
           disabled = function()
-            return rule.useGlobalIconSize ~= false or rule.enabled == false
+            return rule.useGlobalIconSize ~= false or not rule.enabled
           end,
           get = function()
             return rule.iconSize or CooldownCursor:GetDBValue("iconSize")
@@ -258,6 +249,24 @@ local function ShowBehaviorValues()
   }
 end
 
+-- Helper to set smart defaults when Display Mode changes
+local function ApplyDisplayModeDefaults(newMode)
+  if newMode == "HORIZONTAL" then
+    -- Default to RIGHT growth with TOPRIGHT anchor
+    CooldownCursorDB.stackGrowth = "RIGHT"
+    CooldownCursorDB.anchor = "TOPRIGHT"
+  elseif newMode == "VERTICAL" then
+    -- Default to DOWN growth with BOTTOM anchor
+    CooldownCursorDB.stackGrowth = "DOWN"
+    CooldownCursorDB.anchor = "BOTTOM"
+  elseif newMode == "RADIUS" then
+    -- Default to CLOCKWISE growth with CENTER anchor
+    CooldownCursorDB.stackGrowth = "CLOCKWISE"
+    CooldownCursorDB.anchor = "CENTER"
+  end
+  -- SINGLE mode: no automatic changes
+end
+
 local function HexColorGet(key, fallbackHex)
   -- AceConfig color expects r,g,b,a in 0..1
   local hex = (CooldownCursor:GetDBValue(key) or fallbackHex or "ffffff"):gsub("#", "")
@@ -313,13 +322,13 @@ local options = {
     -- ========================================
     quickSettings = {
       type = "group",
-      name = "Common Settings",
+      name = "Quick Settings",
       order = 0,
       args = {
 
         welcomeHeader = {
           type = "header",
-          name = "Common Settings",
+          name = "Quick Settings",
           order = 1,
         },
 
@@ -329,6 +338,39 @@ local options = {
               "These are the essential settings to get started!\n" ..
               "Configure these first, then explore other tabs for advanced options.",
           order = 2,
+        },
+
+        spacer0 = {
+          type = "description",
+          name = " ",
+          order = 3,
+        },
+
+        enabled = {
+          type = "toggle",
+          name = "Enable Addon",
+          desc = "Turn CooldownCursor on or off.\n\n" ..
+              "When disabled, no cooldown icons will appear at your cursor.",
+          order = 4,
+          width = "normal",
+          get = function() return CooldownCursor:GetDBValue("enabled") end,
+          set = function(_, v)
+            CooldownCursor:SetDBBoolean("enabled", v)
+            if not v then
+              CooldownCursor:HideIconNow()
+            end
+          end,
+        },
+
+        enabledWarning = {
+          type = "description",
+          name = function()
+            if CooldownCursor:GetDBValue("enabled") == false then
+              return "|cffff5555CooldownCursor is currently DISABLED.|r No cooldowns will appear at your cursor."
+            end
+            return ""
+          end,
+          order = 4.5,
         },
 
         spacer1 = {
@@ -354,6 +396,7 @@ local options = {
             return CooldownCursor:GetDBValue("stackDirection")
           end,
           set = function(_, v)
+            ApplyDisplayModeDefaults(v)
             CooldownCursor:SetDBString("stackDirection", v)
           end,
         },
@@ -450,7 +493,7 @@ local options = {
         releaseNotesDesc = {
           type = "description",
           name = function()
-            -- Build release notes from categories
+            -- Build release notes organized by version (newest first)
             if not CooldownCursor.releaseNotes then
               return "Check back after the next update for release notes."
             end
@@ -458,35 +501,47 @@ local options = {
             local notes = CooldownCursor.releaseNotes
             local lines = {}
 
-            -- Breaking Changes
-            if notes.breakingChanges and #notes.breakingChanges > 0 then
-              table.insert(lines, "|cffFF1E34 Breaking Changes:|r")
-              for _, change in ipairs(notes.breakingChanges) do
-                table.insert(lines, "• " .. change)
+            -- Iterate through versions (sorted newest first)
+            for _, version in ipairs(notes.sortedVersions or {}) do
+              local versionNotes = notes.byVersion[version]
+              if versionNotes then
+                local hasContent = (versionNotes.breakingChanges and #versionNotes.breakingChanges > 0)
+                    or (versionNotes.newFeatures and #versionNotes.newFeatures > 0)
+                    or (versionNotes.fixes and #versionNotes.fixes > 0)
+
+                if hasContent then
+                  -- Version header
+                  if #lines > 0 then table.insert(lines, "") end
+                  table.insert(lines, "|cff00ff00v" .. version .. "|r")
+
+                  -- Breaking Changes
+                  if versionNotes.breakingChanges and #versionNotes.breakingChanges > 0 then
+                    table.insert(lines, "  |cffFF1E34Breaking Changes:|r")
+                    for _, change in ipairs(versionNotes.breakingChanges) do
+                      table.insert(lines, "  • " .. change)
+                    end
+                  end
+
+                  -- New Features
+                  if versionNotes.newFeatures and #versionNotes.newFeatures > 0 then
+                    table.insert(lines, "  |cff345BFFNew Features:|r")
+                    for _, feature in ipairs(versionNotes.newFeatures) do
+                      table.insert(lines, "  • " .. feature)
+                    end
+                  end
+
+                  -- Fixes
+                  if versionNotes.fixes and #versionNotes.fixes > 0 then
+                    table.insert(lines, "  |cffFFBB4AFixes:|r")
+                    for _, fix in ipairs(versionNotes.fixes) do
+                      table.insert(lines, "  • " .. fix)
+                    end
+                  end
+                end
               end
-              table.insert(lines, "")
             end
 
-            -- New Features
-            if notes.newFeatures and #notes.newFeatures > 0 then
-              if #lines > 0 then table.insert(lines, "") end
-              table.insert(lines, "|cff345BFFNew Features:|r")
-              for _, feature in ipairs(notes.newFeatures) do
-                table.insert(lines, "• " .. feature)
-              end
-              table.insert(lines, "")
-            end
-
-            -- Fixes
-            if notes.fixes and #notes.fixes > 0 then
-              if #lines > 0 then table.insert(lines, "") end
-              table.insert(lines, "|cffFFBB4AFixes:|r")
-              for _, fix in ipairs(notes.fixes) do
-                table.insert(lines, "• " .. fix)
-              end
-            end
-
-            -- If no categories have content
+            -- If no versions have content
             if #lines == 0 then
               return "No release notes for this version."
             end
@@ -747,6 +802,7 @@ local options = {
             return CooldownCursor:GetDBValue("stackDirection")
           end,
           set = function(_, v)
+            ApplyDisplayModeDefaults(v)
             CooldownCursor:SetDBString("stackDirection", v)
           end,
         },
@@ -1138,57 +1194,180 @@ local options = {
       order = 400,
       args = {
 
-        activeRule = {
-          type = "select",
-          name = "Active Rule Mode",
-          values = { [true] = "Whitelist", [false] = "Blacklist" },
-          desc = "Choose whether spell rules are treated as a whitelist or blacklist by default.",
-          order = 405,
-          disabled = function() return CooldownCursorDB.spellRules.settings.disableRules end,
-          get = function()
-            return CooldownCursorDB.spellRules.settings.whitelist
-          end,
-          set = function(_, v)
-            CooldownCursorDB.spellRules.settings.whitelist = v
-            CooldownCursor:UpdateDisplay()
-            CooldownCursor:RebuildSpellRuleOptions()
-            CooldownCursor:NotifyOptionsChanged()
-          end,
+        rulesDescription = {
+          type = "description",
+          name = "Manage which spells show cooldowns at your cursor.\n\n" ..
+              "|cffaaaaaaTip: Only spells added to rules will show cooldowns. Add spells below to enable tracking.|r",
+          order = 400,
         },
-
-        disableRules = {
-          type = "toggle",
-          name = "Disable All Spell Rules",
-          desc = "If enabled, all spell rules will be ignored.",
-          order = 410,
-          get = function()
-            return CooldownCursorDB.spellRules.settings.disableRules
-          end,
-          set = function(_, v)
-            CooldownCursorDB.spellRules.settings.disableRules = v
-            CooldownCursor:UpdateDisplay()
-            CooldownCursor:RebuildSpellRuleOptions()
-            CooldownCursor:NotifyOptionsChanged()
-          end,
-        },
-
 
         header = {
           type = "header",
-          name = "Spell Rule Editor",
+          name = "Add from Spellbook",
           order = 415,
         },
 
-        description = {
+        spellbookDescription = {
           type = "description",
-          name = "Add or update a spell rule by entering its numeric Spell ID below.",
+          name = function()
+            if InCombatLockdown() then
+              return "|cffff5555You are in combat!|r\n" ..
+                  "The spellbook cannot be accessed during combat. " ..
+                  "You can still add spells manually using the Spell ID field below."
+            end
+            return "Select a spell from your spellbook to add it as a rule, or manually enter a Spell ID below."
+          end,
           order = 416,
+        },
+
+        spellbookDropdown = {
+          type = "select",
+          name = "Select Spell",
+          desc = "Choose a spell from your spellbook with a cooldown.\n\n" ..
+              "|cffaaaaaaTip: This list shows all your active spells that have cooldowns.|r",
+          order = 417,
+          width = "double",
+          disabled = function()
+            return InCombatLockdown()
+          end,
+          values = function()
+            if InCombatLockdown() then
+              return { [0] = "|cff888888-- Not available in combat --|r" }
+            end
+            local values = { [0] = "|cff888888-- Select a spell --|r" }
+            local spells = CooldownCursor:GetCooldownSpells(true, 0)
+
+            for _, spell in ipairs(spells) do
+              if spell.spellID and spell.name then
+                -- Format: "|Ticon:size|t Spell Name (ID) [Tab]"
+                local icon = spell.iconID and string.format("|T%d:14:14:0:0|t ", spell.iconID) or ""
+                local label = string.format("%s%s |cff888888(%d)|r", icon, spell.name, spell.spellID)
+                if spell.tabName then
+                  label = label .. string.format(" |cff666666[%s]|r", spell.tabName)
+                end
+                values[spell.spellID] = label
+              end
+            end
+
+            return values
+          end,
+          sorting = function()
+            -- Return spellIDs sorted alphabetically by spell name
+            local spells = CooldownCursor:GetCooldownSpells(true)
+            table.sort(spells, function(a, b)
+              return (a.name or ""):lower() < (b.name or ""):lower()
+            end)
+
+            local sortedKeys = { 0 } -- "Select a spell" first
+            for _, spell in ipairs(spells) do
+              if spell.spellID then
+                table.insert(sortedKeys, spell.spellID)
+              end
+            end
+            return sortedKeys
+          end,
+          get = function()
+            return CooldownCursor._selectedSpellbookSpell or 0
+          end,
+          set = function(_, v)
+            CooldownCursor._selectedSpellbookSpell = v
+            if v and v > 0 then
+              -- Auto-fill the spell ID input
+              CooldownCursor._newRuleSpellID = v
+              CooldownCursor._spellRuleStatusText = nil
+              CooldownCursor:NotifyOptionsChanged()
+            end
+          end,
+        },
+
+        addFromSpellbook = {
+          type = "execute",
+          name = "Add",
+          desc = "Add the selected spell to your rules.\n\n" ..
+              "|cffaaaaaaTip: Select a spell from the dropdown first.|r",
+          order = 418,
+          width = "half",
+          func = function()
+            local spellID = CooldownCursor._selectedSpellbookSpell
+            if not spellID or spellID == 0 then
+              CooldownCursor._spellRuleStatusText = "Please select a spell first"
+              CooldownCursor._spellRuleStatusColor = "ff5555"
+              CooldownCursor:NotifyOptionsChanged()
+              return
+            end
+
+            local info = C_Spell.GetSpellInfo(spellID)
+            if not info then
+              CooldownCursor._spellRuleStatusText = "Spell not found"
+              CooldownCursor._spellRuleStatusColor = "ff5555"
+              CooldownCursor:NotifyOptionsChanged()
+              return
+            end
+
+            -- Add rule with default settings (enabled by default)
+            CooldownCursor:AddOrUpdateSpellRule(spellID, {
+              enabled = true,
+              priority = 0,
+            })
+
+            CooldownCursor._spellRuleStatusText =
+                ("Added: %s (%d)"):format(info.name, spellID)
+            CooldownCursor._spellRuleStatusColor = "55ff55"
+
+            -- Reset selection
+            CooldownCursor._selectedSpellbookSpell = 0
+
+            CooldownCursor:RebuildSpellRuleOptions()
+            CooldownCursor:NotifyOptionsChanged()
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
+        spacer1 = {
+          type = "description",
+          name = " ",
+          order = 419,
+        },
+
+        manualHeader = {
+          type = "header",
+          name = "Edit Mode",
+          order = 420,
+        },
+
+        manualDescription = {
+          type = "description",
+          name = function()
+            local spellID = CooldownCursor._newRuleSpellID
+            if spellID and spellID > 0 then
+              local info = C_Spell.GetSpellInfo(spellID)
+              if info then
+                local icon = info.iconID and string.format("|T%d:20:20:0:0|t ", info.iconID) or ""
+                local baseCooldownMS = GetSpellBaseCooldown(spellID)
+                local baseCooldown = baseCooldownMS and (baseCooldownMS / 1000) or 0
+
+                local details = string.format(
+                  "%s|cff00ff00%s|r  |cff888888(ID: %d)|r\n" ..
+                  "Base Cooldown: |cffffffff%s|r",
+                  icon,
+                  info.name,
+                  spellID,
+                  baseCooldown > 0 and string.format("%.1fs", baseCooldown) or "None"
+                )
+                return details
+              else
+                return "|cffff5555Spell not found.|r Enter a valid Spell ID."
+              end
+            end
+            return "Select a spell from the dropdown above, or enter a Spell ID manually."
+          end,
+          order = 420.5,
         },
 
         spacer = {
           type = "description",
           name = " ",
-          order = 420,
+          order = 420.6,
         },
 
         spellID = {
@@ -1204,14 +1383,14 @@ local options = {
           set = function(_, value)
             local id = tonumber(value)
             CooldownCursor._newRuleSpellID = id
+            CooldownCursor:NotifyOptionsChanged()
           end,
         },
 
         enabled = {
-          type = "select",
-          name = "Add to",
-          desc = "Choose whether to add the spell as a whitelist or blacklist rule.",
-          values = { [true] = "Whitelist", [false] = "Blacklist" },
+          type = "toggle",
+          name = "Enabled",
+          desc = "When enabled, this spell will show cooldowns at your cursor.",
           order = 422,
           get = function()
             return CooldownCursor._newRuleEnabled ~= false
@@ -1248,17 +1427,37 @@ local options = {
           min = 16,
           max = 128,
           step = 1,
+          disabled = function()
+            return CooldownCursor._newRuleUseGlobalIconSize ~= false
+          end,
           get = function()
             return CooldownCursor._newRuleIconSize or CooldownCursor:GetDBValue("iconSize")
           end,
           set = function(_, v)
             CooldownCursor._newRuleIconSize = v
+            CooldownCursor._newRuleUseGlobalIconSize = false
+          end,
+        },
+
+        useGlobalIconSize = {
+          type = "toggle",
+          name = "Use Global Icon Size",
+          desc = "Use the global icon size instead of a per-spell value.",
+          order = 424.5,
+          get = function()
+            return CooldownCursor._newRuleUseGlobalIconSize ~= false
+          end,
+          set = function(_, v)
+            CooldownCursor._newRuleUseGlobalIconSize = v
+            if v then
+              CooldownCursor._newRuleIconSize = nil
+            end
           end,
         },
 
         add = {
           type = "execute",
-          name = "Add / Update Spell Rule",
+          name = "Add / Update",
           order = 425,
           func = function()
             local spellID = CooldownCursor._newRuleSpellID
@@ -1279,9 +1478,11 @@ local options = {
             end
 
             -- Add / update rule
+            local useGlobal = CooldownCursor._newRuleUseGlobalIconSize ~= false
             CooldownCursor:AddOrUpdateSpellRule(spellID, {
               enabled  = CooldownCursor._newRuleEnabled ~= false,
-              iconSize = CooldownCursor._newRuleIconSize,
+              iconSize = useGlobal and nil or CooldownCursor._newRuleIconSize,
+              useGlobalIconSize = useGlobal,
               priority = CooldownCursor._newRulePriority or 0,
             })
 
@@ -1292,6 +1493,8 @@ local options = {
             -- Reset inputs
             CooldownCursor._newRuleSpellID = nil
             CooldownCursor._newRulePriority = nil
+            CooldownCursor._newRuleIconSize = nil
+            CooldownCursor._newRuleUseGlobalIconSize = nil
 
             CooldownCursor:RebuildSpellRuleOptions()
             CooldownCursor:NotifyOptionsChanged()
@@ -1312,6 +1515,26 @@ local options = {
             )
           end,
           order = 424.5,
+        },
+
+        spellbookHeader = {
+          type = "header",
+          name = "",
+          order = 500,
+        },
+
+        refreshSpellbook = {
+          type = "execute",
+          name = "Refresh Spellbook",
+          desc = "Refresh the spellbook list.\n\n" ..
+              "|cffaaaaaaTip: Use this after changing talents or specialization.|r",
+          order = 510,
+          func = function()
+            CooldownCursor:InvalidateSpellBookCache()
+            CooldownCursor._spellRuleStatusText = "Spellbook refreshed!"
+            CooldownCursor._spellRuleStatusColor = "55ff55"
+            CooldownCursor:NotifyOptionsChanged()
+          end,
         },
       },
     },
@@ -1388,6 +1611,56 @@ local options = {
           order = 60,
           confirm = true,
           func = function() CooldownCursor:ResetSettings() end,
+        },
+
+        clearAllSpellRules = {
+          type = "execute",
+          name = "Clear All Spell Rules",
+          desc = "Remove all spell rules you have added.\n\n" ..
+              "|cffff8800Warning:|r This cannot be undone!",
+          order = 70,
+          confirm = true,
+          confirmText = "Are you sure you want to delete ALL spell rules? This cannot be undone.",
+          func = function()
+            CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or {}
+            CooldownCursorDB.spellRules.rules = {}
+            CooldownCursor:RebuildSpellRuleOptions()
+            CooldownCursor:NotifyOptionsChanged()
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
+        spellRulesHeader = {
+          type = "header",
+          name = "Spell Rules",
+          order = 80,
+        },
+
+        disableRules = {
+          type = "toggle",
+          name = "Disable All Spell Rules",
+          desc = "When enabled, spell rules are ignored and all spells will show cooldowns.",
+          order = 90,
+          get = function()
+            return CooldownCursorDB.spellRules.settings.disableRules
+          end,
+          set = function(_, v)
+            CooldownCursorDB.spellRules.settings.disableRules = v
+            CooldownCursor:UpdateDisplay()
+            CooldownCursor:RebuildSpellRuleOptions()
+            CooldownCursor:NotifyOptionsChanged()
+          end,
+        },
+
+        disableRulesWarning = {
+          type = "description",
+          name = function()
+            if CooldownCursorDB.spellRules.settings.disableRules then
+              return "|cffff5555Spell rules are currently DISABLED.|r All spells will show cooldowns."
+            end
+            return ""
+          end,
+          order = 91,
         },
       },
     },

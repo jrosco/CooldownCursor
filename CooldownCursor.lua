@@ -6,6 +6,42 @@ local CooldownCursor = CreateFrame("Frame")
 addonTable.Frame = CooldownCursor
 
 ----------------------------------------------------
+-- Module System (Metatable Delegation)
+-- Modules register in addonTable.Modules and their
+-- methods become available on CooldownCursor
+----------------------------------------------------
+addonTable.Modules = addonTable.Modules or {}
+
+-- Preserve the original Frame metatable
+local originalMT = getmetatable(CooldownCursor)
+local originalIndex = originalMT and originalMT.__index
+
+setmetatable(CooldownCursor, {
+  __index = function(self, key)
+    -- First, check the original Frame methods
+    if originalIndex then
+      local value
+      if type(originalIndex) == "function" then
+        value = originalIndex(self, key)
+      elseif type(originalIndex) == "table" then
+        value = originalIndex[key]
+      end
+      if value ~= nil then
+        return value
+      end
+    end
+
+    -- Then search registered modules for the method
+    for _, module in pairs(addonTable.Modules) do
+      if module[key] then
+        return module[key]
+      end
+    end
+    return nil
+  end
+})
+
+----------------------------------------------------
 -- Runtime state
 ----------------------------------------------------
 local lastSpellId = nil
@@ -125,13 +161,13 @@ local previewTicker = nil
 ----------------------------------------------------
 local spellRules = {
   settings = {
-    whitelist = true,
     disableRules = false,
   },
   rules = {}
 }
 
 local defaults = {
+  enabled = true,
   offsetX = 0,
   offsetY = 0,
   scale = 1,
@@ -221,6 +257,17 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
     end
   end
   ----------------------------------------------------------------------------------
+
+  ----------------------------------------------------------------------------------
+  -- migration v2.1.0 - Remove whitelist setting -----------------------------------
+  if not CooldownCursorDB._migratedWhitelist then
+    -- Remove deprecated whitelist setting from spell rules
+    if CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.settings then
+      CooldownCursorDB.spellRules.settings.whitelist = nil
+    end
+    CooldownCursorDB._migratedWhitelist = true
+  end
+  ----------------------------------------------------------------------------------
   ----------------------------------------------------------------------------------
 
   CooldownCursorDB._version = major
@@ -230,26 +277,82 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- ========================================
   -- These are just for showing users what changed
   -- No code execution, just messages
+  -- Notes are organized by version (newest first)
 
-  -- breaking changes
-  table.insert(breakingChanges, "Changed 'Show When' default from 'Always' to 'In Combat' (v2.0.0)")
-  table.insert(breakingChanges, "Changed 'Anchor' default to 'Top Right' (v2.0.0)")
-  table.insert(breakingChanges,
-    "NOTE: This release is in Beta and may contain bugs. Please report any issues on the CurseForge page (v2.0.0)")
-  -- new features
-  table.insert(newFeatures, "Added RADIUS, HORIZONTAL and VERTICAL display modes for multi-icon stacking (v2.0.0)")
-  table.insert(newFeatures, "Added HORIZONTAL and VERTICAL stack directions (v2.0.0)")
-  -- fixes
-  table.insert(fixes, "Fixed SPELL_UPDATE_COOLDOWN not triggering spells with CD Buff updates (v2.0.0)")
-  table.insert(fixes, "Fixed Masque skin/style when showing multiple icon display (v2.0.1)")
-  table.insert(fixes, "Fixed Minor bug fixes (v2.0.3)")
-  table.insert(fixes, "Improved cooldown accuracy: all active icons now refresh when buffs/talents affect multiple cooldowns (v2.0.4)")
+  local releaseNotesByVersion = {
+    ["2.1.0"] = {
+      breakingChanges = {
+        "Simplified Spell Rules: Removed whitelist/blacklist mode - now uses simple enable/disable per spell",
+        "Spells must now be explicitly added to rules to show cooldowns",
+      },
+      newFeatures = {
+        "Added ability to completely disable the addon from Quick Settings",
+        "Added spellbook dropdown for easy spell rule management",
+        "Added primary icon indicator in RADIUS preview mode",
+        "Preview mode now uses your spell rules instead of default spells",
+        "Display Mode now auto-sets anchor and growth direction defaults",
+        "Moved 'Disable All Spell Rules' to Advanced tab",
+      },
+      fixes = {},
+    },
+    ["2.0.4"] = {
+      breakingChanges = {},
+      newFeatures = {},
+      fixes = {
+        "Improved cooldown accuracy: all active icons now refresh when buffs/talents affect multiple cooldowns",
+      },
+    },
+    ["2.0.3"] = {
+      breakingChanges = {},
+      newFeatures = {},
+      fixes = {
+        "Fixed Minor bug fixes",
+      },
+    },
+    ["2.0.1"] = {
+      breakingChanges = {},
+      newFeatures = {},
+      fixes = {
+        "Fixed Masque skin/style when showing multiple icon display",
+      },
+    },
+    ["2.0.0"] = {
+      breakingChanges = {
+        "Changed 'Show When' default from 'Always' to 'In Combat'",
+        "Changed 'Anchor' default to 'Top Right'",
+      },
+      newFeatures = {
+        "Added RADIUS, HORIZONTAL and VERTICAL display modes for multi-icon stacking",
+        "Added HORIZONTAL and VERTICAL stack directions",
+      },
+      fixes = {
+        "Fixed SPELL_UPDATE_COOLDOWN not triggering spells with CD Buff updates",
+      },
+    },
+  }
+
+  -- Helper to parse version string into comparable numbers
+  local function ParseVersion(vStr)
+    local major, minor, patch = vStr:match("^(%d+)%.(%d+)%.(%d+)$")
+    if major then
+      return tonumber(major) * 10000 + tonumber(minor) * 100 + tonumber(patch)
+    end
+    return 0
+  end
+
+  -- Sort versions (newest first)
+  local sortedVersions = {}
+  for version in pairs(releaseNotesByVersion) do
+    table.insert(sortedVersions, version)
+  end
+  table.sort(sortedVersions, function(a, b)
+    return ParseVersion(a) > ParseVersion(b)
+  end)
 
   -- Store for Options.lua to display
   self.releaseNotes = {
-    breakingChanges = breakingChanges,
-    newFeatures = newFeatures,
-    fixes = fixes,
+    byVersion = releaseNotesByVersion,
+    sortedVersions = sortedVersions,
   }
 end
 
@@ -305,6 +408,19 @@ local function CreateIconFrame(index)
     ReturnIconToPool(iconFrame)
   end)
 
+  -- Primary icon indicator border (for preview mode)
+  iconFrame.primaryBorder = iconFrame:CreateTexture(nil, "OVERLAY")
+  iconFrame.primaryBorder:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", -3, 3)
+  iconFrame.primaryBorder:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", 3, -3)
+  iconFrame.primaryBorder:SetColorTexture(0, 1, 0, 0.8) -- Green border
+  iconFrame.primaryBorder:Hide()
+
+  -- Primary label text
+  iconFrame.primaryLabel = iconFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  iconFrame.primaryLabel:SetPoint("BOTTOM", iconFrame, "TOP", 0, 6)
+  iconFrame.primaryLabel:SetText("|cff00ff00PRIMARY|r")
+  iconFrame.primaryLabel:Hide()
+
   iconFrame.iconID = index
   iconFrame.spellID = nil
   iconFrame.addedTime = nil
@@ -346,6 +462,14 @@ function ReturnIconToPool(iconFrame)
   iconFrame.priority = 0
   iconFrame.stackOffsetX = 0
   iconFrame.stackOffsetY = 0
+
+  -- Hide primary indicator
+  if iconFrame.primaryBorder then
+    iconFrame.primaryBorder:Hide()
+  end
+  if iconFrame.primaryLabel then
+    iconFrame.primaryLabel:Hide()
+  end
 
   if iconFrame.hideTimer then
     iconFrame.hideTimer:Cancel()
@@ -891,23 +1015,19 @@ end
 ----------------------------------------------------
 function CooldownCursor:GetSpellRule(spellID)
   local data = CooldownCursorDB.spellRules
-  if not data or not data.rules then return true end
+  if not data or not data.rules then return false end
   if data.settings.disableRules then return true end
 
   local rules = data.rules
-  if not next(rules) then return true end
+  -- If no rules exist, don't show any spells
+  if not next(rules) then return false end
 
   local rule = rules[spellID]
+  -- If spell is not in rules, don't show it
+  if not rule then return false end
 
-  if data.settings.whitelist then
-    return rule and rule.enabled ~= false, rule
-  end
-
-  if rule and rule.enabled == false then
-    return false
-  end
-
-  return true, rule
+  -- Return whether the spell is enabled
+  return rule.enabled ~= false, rule
 end
 
 ----------------------------------------------------
@@ -1137,7 +1257,10 @@ function CooldownCursor:GetNotes()
 end
 
 function CooldownCursor:GetDBValue(key)
-  return CooldownCursorDB[key] or defaults[key]
+  if CooldownCursorDB[key] ~= nil then
+    return CooldownCursorDB[key]
+  end
+  return defaults[key]
 end
 
 function CooldownCursor:SetDBString(key, value)
@@ -1434,12 +1557,47 @@ function CooldownCursor:PreviewMultiIcon()
     return
   end
 
+  -- Build preview spell list from spell rules, or fall back to default pool
+  local function GetPreviewSpells()
+    local previewSpells = {}
+    local rules = CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules
+
+    if rules and next(rules) then
+      -- Use spells from user's spell rules
+      for spellID, rule in pairs(rules) do
+        if rule.enabled ~= false then
+          local info = C_Spell.GetSpellInfo(spellID)
+          if info then
+            table.insert(previewSpells, {
+              id = spellID,
+              duration = 30 + (#previewSpells * 5), -- Vary durations
+              name = info.name,
+              priority = rule.priority or 0,
+            })
+          end
+        end
+      end
+      -- Sort by priority (highest first)
+      table.sort(previewSpells, function(a, b)
+        return a.priority > b.priority
+      end)
+    end
+
+    -- Fall back to default pool if no spell rules
+    if #previewSpells == 0 then
+      return PREVIEW_SPELL_POOL
+    end
+
+    return previewSpells
+  end
+
   local function ShowPreviewIcons()
     local maxIcons = self:GetDBValue("maxIcons")
-    local numToShow = math.min(maxIcons, #PREVIEW_SPELL_POOL)
+    local spellPool = GetPreviewSpells()
+    local numToShow = math.min(maxIcons, #spellPool)
 
     for i = 1, numToShow do
-      local spellData = PREVIEW_SPELL_POOL[i]
+      local spellData = spellPool[i]
       local durationObj = C_DurationUtil.CreateDuration()
       durationObj:SetTimeFromStart(GetTime(), spellData.duration)
       ShowSpellIcon(spellData.id, durationObj)
@@ -1453,9 +1611,20 @@ end
 function CooldownCursor:ApplyPreviewPosition()
   if not previewActive then return end
 
+  local isRadius = (CooldownCursorDB.stackDirection or defaults.stackDirection) == "RADIUS"
+
   if previewMouseMode then
-    for _, iconData in ipairs(iconsByPriority) do
+    for i, iconData in ipairs(iconsByPriority) do
       iconData.iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
+
+      -- Show primary indicator on first icon in RADIUS mode
+      if isRadius and i == 1 then
+        iconData.iconFrame.primaryBorder:Show()
+        iconData.iconFrame.primaryLabel:Show()
+      else
+        iconData.iconFrame.primaryBorder:Hide()
+        iconData.iconFrame.primaryLabel:Hide()
+      end
     end
   else
     for _, iconData in ipairs(iconsByPriority) do
@@ -1465,6 +1634,10 @@ function CooldownCursor:ApplyPreviewPosition()
       icon:ClearAllPoints()
       local anchor = SettingsPanel or UIParent
       icon:SetPoint("LEFT", anchor, "RIGHT", 8, 0)
+
+      -- Hide primary indicator when not following mouse
+      icon.primaryBorder:Hide()
+      icon.primaryLabel:Hide()
     end
   end
 end
@@ -1521,6 +1694,11 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   end
 
   if SPELL_EVENTS[event] then
+    -- Check if addon is enabled
+    if CooldownCursorDB.enabled == false then
+      return
+    end
+
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
       return
     end

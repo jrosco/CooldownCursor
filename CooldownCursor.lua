@@ -282,6 +282,7 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
         "Added ability to completely disable the addon from Quick Settings",
         "Added spellbook dropdown for easy spell rule management",
         "Added primary icon indicator in RADIUS preview mode",
+        "Preview mode now uses your spell rules instead of default spells",
         "Display Mode now auto-sets anchor and growth direction defaults",
         "Moved 'Disable All Spell Rules' to Advanced tab",
       },
@@ -1433,12 +1434,47 @@ function CooldownCursor:PreviewMultiIcon()
     return
   end
 
+  -- Build preview spell list from spell rules, or fall back to default pool
+  local function GetPreviewSpells()
+    local previewSpells = {}
+    local rules = CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules
+
+    if rules and next(rules) then
+      -- Use spells from user's spell rules
+      for spellID, rule in pairs(rules) do
+        if rule.enabled ~= false then
+          local info = C_Spell.GetSpellInfo(spellID)
+          if info then
+            table.insert(previewSpells, {
+              id = spellID,
+              duration = 30 + (#previewSpells * 5), -- Vary durations
+              name = info.name,
+              priority = rule.priority or 0,
+            })
+          end
+        end
+      end
+      -- Sort by priority (highest first)
+      table.sort(previewSpells, function(a, b)
+        return a.priority > b.priority
+      end)
+    end
+
+    -- Fall back to default pool if no spell rules
+    if #previewSpells == 0 then
+      return PREVIEW_SPELL_POOL
+    end
+
+    return previewSpells
+  end
+
   local function ShowPreviewIcons()
     local maxIcons = self:GetDBValue("maxIcons")
-    local numToShow = math.min(maxIcons, #PREVIEW_SPELL_POOL)
+    local spellPool = GetPreviewSpells()
+    local numToShow = math.min(maxIcons, #spellPool)
 
     for i = 1, numToShow do
-      local spellData = PREVIEW_SPELL_POOL[i]
+      local spellData = spellPool[i]
       local durationObj = C_DurationUtil.CreateDuration()
       durationObj:SetTimeFromStart(GetTime(), spellData.duration)
       ShowSpellIcon(spellData.id, durationObj)

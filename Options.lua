@@ -415,7 +415,7 @@ local options = {
         releaseNotesDesc = {
           type = "description",
           name = function()
-            -- Build release notes from categories
+            -- Build release notes organized by version (newest first)
             if not CooldownCursor.releaseNotes then
               return "Check back after the next update for release notes."
             end
@@ -423,35 +423,47 @@ local options = {
             local notes = CooldownCursor.releaseNotes
             local lines = {}
 
-            -- Breaking Changes
-            if notes.breakingChanges and #notes.breakingChanges > 0 then
-              table.insert(lines, "|cffFF1E34 Breaking Changes:|r")
-              for _, change in ipairs(notes.breakingChanges) do
-                table.insert(lines, "• " .. change)
+            -- Iterate through versions (sorted newest first)
+            for _, version in ipairs(notes.sortedVersions or {}) do
+              local versionNotes = notes.byVersion[version]
+              if versionNotes then
+                local hasContent = (versionNotes.breakingChanges and #versionNotes.breakingChanges > 0)
+                    or (versionNotes.newFeatures and #versionNotes.newFeatures > 0)
+                    or (versionNotes.fixes and #versionNotes.fixes > 0)
+
+                if hasContent then
+                  -- Version header
+                  if #lines > 0 then table.insert(lines, "") end
+                  table.insert(lines, "|cff00ff00v" .. version .. "|r")
+
+                  -- Breaking Changes
+                  if versionNotes.breakingChanges and #versionNotes.breakingChanges > 0 then
+                    table.insert(lines, "  |cffFF1E34Breaking Changes:|r")
+                    for _, change in ipairs(versionNotes.breakingChanges) do
+                      table.insert(lines, "  • " .. change)
+                    end
+                  end
+
+                  -- New Features
+                  if versionNotes.newFeatures and #versionNotes.newFeatures > 0 then
+                    table.insert(lines, "  |cff345BFFNew Features:|r")
+                    for _, feature in ipairs(versionNotes.newFeatures) do
+                      table.insert(lines, "  • " .. feature)
+                    end
+                  end
+
+                  -- Fixes
+                  if versionNotes.fixes and #versionNotes.fixes > 0 then
+                    table.insert(lines, "  |cffFFBB4AFixes:|r")
+                    for _, fix in ipairs(versionNotes.fixes) do
+                      table.insert(lines, "  • " .. fix)
+                    end
+                  end
+                end
               end
-              table.insert(lines, "")
             end
 
-            -- New Features
-            if notes.newFeatures and #notes.newFeatures > 0 then
-              if #lines > 0 then table.insert(lines, "") end
-              table.insert(lines, "|cff345BFFNew Features:|r")
-              for _, feature in ipairs(notes.newFeatures) do
-                table.insert(lines, "• " .. feature)
-              end
-              table.insert(lines, "")
-            end
-
-            -- Fixes
-            if notes.fixes and #notes.fixes > 0 then
-              if #lines > 0 then table.insert(lines, "") end
-              table.insert(lines, "|cffFFBB4AFixes:|r")
-              for _, fix in ipairs(notes.fixes) do
-                table.insert(lines, "• " .. fix)
-              end
-            end
-
-            -- If no categories have content
+            -- If no versions have content
             if #lines == 0 then
               return "No release notes for this version."
             end

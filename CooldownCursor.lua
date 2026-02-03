@@ -269,28 +269,78 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- ========================================
   -- These are just for showing users what changed
   -- No code execution, just messages
+  -- Notes are organized by version (newest first)
 
-  -- breaking changes
-  table.insert(breakingChanges, "Simplified Spell Rules: Removed whitelist/blacklist mode - now uses simple enable/disable per spell (v2.1.0)")
-  table.insert(breakingChanges, "Spells must now be explicitly added to rules to show cooldowns (v2.1.0)")
-  table.insert(breakingChanges, "Changed 'Show When' default from 'Always' to 'In Combat' (v2.0.0)")
-  table.insert(breakingChanges, "Changed 'Anchor' default to 'Top Right' (v2.0.0)")
-  -- new features
-  table.insert(newFeatures, "Added spellbook dropdown for easy spell rule management (v2.1.0)")
-  table.insert(newFeatures, "Moved 'Disable All Spell Rules' to Advanced tab (v2.1.0)")
-  table.insert(newFeatures, "Added RADIUS, HORIZONTAL and VERTICAL display modes for multi-icon stacking (v2.0.0)")
-  table.insert(newFeatures, "Added HORIZONTAL and VERTICAL stack directions (v2.0.0)")
-  -- fixes
-  table.insert(fixes, "Fixed SPELL_UPDATE_COOLDOWN not triggering spells with CD Buff updates (v2.0.0)")
-  table.insert(fixes, "Fixed Masque skin/style when showing multiple icon display (v2.0.1)")
-  table.insert(fixes, "Fixed Minor bug fixes (v2.0.3)")
-  table.insert(fixes, "Improved cooldown accuracy: all active icons now refresh when buffs/talents affect multiple cooldowns (v2.0.4)")
+  local releaseNotesByVersion = {
+    ["2.1.0"] = {
+      breakingChanges = {
+        "Simplified Spell Rules: Removed whitelist/blacklist mode - now uses simple enable/disable per spell",
+        "Spells must now be explicitly added to rules to show cooldowns",
+      },
+      newFeatures = {
+        "Added spellbook dropdown for easy spell rule management",
+        "Moved 'Disable All Spell Rules' to Advanced tab",
+      },
+      fixes = {},
+    },
+    ["2.0.4"] = {
+      breakingChanges = {},
+      newFeatures = {},
+      fixes = {
+        "Improved cooldown accuracy: all active icons now refresh when buffs/talents affect multiple cooldowns",
+      },
+    },
+    ["2.0.3"] = {
+      breakingChanges = {},
+      newFeatures = {},
+      fixes = {
+        "Fixed Minor bug fixes",
+      },
+    },
+    ["2.0.1"] = {
+      breakingChanges = {},
+      newFeatures = {},
+      fixes = {
+        "Fixed Masque skin/style when showing multiple icon display",
+      },
+    },
+    ["2.0.0"] = {
+      breakingChanges = {
+        "Changed 'Show When' default from 'Always' to 'In Combat'",
+        "Changed 'Anchor' default to 'Top Right'",
+      },
+      newFeatures = {
+        "Added RADIUS, HORIZONTAL and VERTICAL display modes for multi-icon stacking",
+        "Added HORIZONTAL and VERTICAL stack directions",
+      },
+      fixes = {
+        "Fixed SPELL_UPDATE_COOLDOWN not triggering spells with CD Buff updates",
+      },
+    },
+  }
+
+  -- Helper to parse version string into comparable numbers
+  local function ParseVersion(vStr)
+    local major, minor, patch = vStr:match("^(%d+)%.(%d+)%.(%d+)$")
+    if major then
+      return tonumber(major) * 10000 + tonumber(minor) * 100 + tonumber(patch)
+    end
+    return 0
+  end
+
+  -- Sort versions (newest first)
+  local sortedVersions = {}
+  for version in pairs(releaseNotesByVersion) do
+    table.insert(sortedVersions, version)
+  end
+  table.sort(sortedVersions, function(a, b)
+    return ParseVersion(a) > ParseVersion(b)
+  end)
 
   -- Store for Options.lua to display
   self.releaseNotes = {
-    breakingChanges = breakingChanges,
-    newFeatures = newFeatures,
-    fixes = fixes,
+    byVersion = releaseNotesByVersion,
+    sortedVersions = sortedVersions,
   }
 end
 

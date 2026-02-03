@@ -55,7 +55,7 @@ function CooldownCursor:RebuildSpellRuleOptions()
   local sorted = {}
 
   for spellID, rule in pairs(CooldownCursorDB.spellRules.rules) do
-    if type(spellID) == "number" then
+    if type(spellID) == "number" and IsPlayerSpell(spellID) then
       local info = C_Spell.GetSpellInfo(spellID)
       local name = info and info.name or ("SpellID " .. spellID)
       local icon = info and info.originalIconID or nil
@@ -1265,7 +1265,7 @@ local options = {
               return { [0] = "|cff888888-- Not available in combat --|r" }
             end
             local values = { [0] = "|cff888888-- Select a spell --|r" }
-            local spells = CooldownCursor:GetCooldownSpells(true, 0)
+            local spells = CooldownCursor:GetCooldownSpells(true, 1.5, true)
 
             for _, spell in ipairs(spells) do
               if spell.spellID and spell.name then
@@ -1283,7 +1283,7 @@ local options = {
           end,
           sorting = function()
             -- Return spellIDs sorted alphabetically by spell name
-            local spells = CooldownCursor:GetCooldownSpells(true)
+            local spells = CooldownCursor:GetCooldownSpells(true, 1.5, true)
             table.sort(spells, function(a, b)
               return (a.name or ""):lower() < (b.name or ""):lower()
             end)
@@ -1559,6 +1559,9 @@ local options = {
           desc = "Refresh the spellbook list.\n\n" ..
               "|cffaaaaaaTip: Use this after changing talents or specialization.|r",
           order = 510,
+          disabled = function()
+            return InCombatLockdown()
+          end,
           func = function()
             CooldownCursor:InvalidateSpellBookCache()
             CooldownCursor._spellRuleStatusText = "Spellbook refreshed!"
@@ -1746,6 +1749,7 @@ CooldownCursor.options = options
 function CooldownCursor:OnOptionsOpened()
   -- Options Panel Opened
   CooldownCursor:HideIconNow()
+  self:RebuildSpellRuleOptions()
   CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
 end
 

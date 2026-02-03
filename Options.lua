@@ -1110,7 +1110,14 @@ local options = {
 
         spellbookDescription = {
           type = "description",
-          name = "Select a spell from your spellbook to add it as a rule, or manually enter a Spell ID below.",
+          name = function()
+            if InCombatLockdown() then
+              return "|cffff5555You are in combat!|r\n" ..
+                  "The spellbook cannot be accessed during combat. " ..
+                  "You can still add spells manually using the Spell ID field below."
+            end
+            return "Select a spell from your spellbook to add it as a rule, or manually enter a Spell ID below."
+          end,
           order = 416,
         },
 
@@ -1121,7 +1128,13 @@ local options = {
               "|cffaaaaaaTip: This list shows all your active spells that have cooldowns.|r",
           order = 417,
           width = "double",
+          disabled = function()
+            return InCombatLockdown()
+          end,
           values = function()
+            if InCombatLockdown() then
+              return { [0] = "|cff888888-- Not available in combat --|r" }
+            end
             local values = { [0] = "|cff888888-- Select a spell --|r" }
             local spells = CooldownCursor:GetCooldownSpells(true)
 
@@ -1315,11 +1328,31 @@ local options = {
           min = 16,
           max = 128,
           step = 1,
+          disabled = function()
+            return CooldownCursor._newRuleUseGlobalIconSize ~= false
+          end,
           get = function()
             return CooldownCursor._newRuleIconSize or CooldownCursor:GetDBValue("iconSize")
           end,
           set = function(_, v)
             CooldownCursor._newRuleIconSize = v
+            CooldownCursor._newRuleUseGlobalIconSize = false
+          end,
+        },
+
+        useGlobalIconSize = {
+          type = "toggle",
+          name = "Use Global Icon Size",
+          desc = "Use the global icon size instead of a per-spell value.",
+          order = 424.5,
+          get = function()
+            return CooldownCursor._newRuleUseGlobalIconSize ~= false
+          end,
+          set = function(_, v)
+            CooldownCursor._newRuleUseGlobalIconSize = v
+            if v then
+              CooldownCursor._newRuleIconSize = nil
+            end
           end,
         },
 
@@ -1346,9 +1379,11 @@ local options = {
             end
 
             -- Add / update rule
+            local useGlobal = CooldownCursor._newRuleUseGlobalIconSize ~= false
             CooldownCursor:AddOrUpdateSpellRule(spellID, {
               enabled  = CooldownCursor._newRuleEnabled ~= false,
-              iconSize = CooldownCursor._newRuleIconSize,
+              iconSize = useGlobal and nil or CooldownCursor._newRuleIconSize,
+              useGlobalIconSize = useGlobal,
               priority = CooldownCursor._newRulePriority or 0,
             })
 
@@ -1359,6 +1394,8 @@ local options = {
             -- Reset inputs
             CooldownCursor._newRuleSpellID = nil
             CooldownCursor._newRulePriority = nil
+            CooldownCursor._newRuleIconSize = nil
+            CooldownCursor._newRuleUseGlobalIconSize = nil
 
             CooldownCursor:RebuildSpellRuleOptions()
             CooldownCursor:NotifyOptionsChanged()

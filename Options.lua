@@ -1169,7 +1169,7 @@ local options = {
               return { [0] = "|cff888888-- Not available in combat --|r" }
             end
             local values = { [0] = "|cff888888-- Select a spell --|r" }
-            local spells = CooldownCursor:GetCooldownSpells(true)
+            local spells = CooldownCursor:GetCooldownSpells(true, 0)
 
             for _, spell in ipairs(spells) do
               if spell.spellID and spell.name then

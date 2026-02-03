@@ -203,14 +203,21 @@ end
 
 --- Get only spells with cooldowns (useful for cooldown tracking)
 -- @param includePetSpells boolean - Include pet spells
+-- @param minCooldown number - Minimum base cooldown in seconds (default 1.5 to filter GCD-only spells)
 -- @return table - Array of cooldown spell data
-function Spells:GetCooldownSpells(includePetSpells)
+function Spells:GetCooldownSpells(includePetSpells, minCooldown)
   local allSpells = self:GetAllSpellBookSpells(includePetSpells, false, false)
   local cooldownSpells = {}
 
+  -- Default to 1.5 seconds to filter out GCD-only spells
+  minCooldown = minCooldown or 1.5
+
   for _, spell in ipairs(allSpells) do
     if spell.hasCooldown and not spell.isPassive then
-      table.insert(cooldownSpells, spell)
+      -- Filter by minimum cooldown if specified
+      if spell.baseCooldown >= minCooldown then
+        table.insert(cooldownSpells, spell)
+      end
     end
   end
 

@@ -286,14 +286,20 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
         "Spells must now be explicitly added to rules to show cooldowns",
       },
       newFeatures = {
+        "Added Show Behavior modes: On Cooldown, Off Cooldown (Ready) - Experimental",
         "Added ability to completely disable the addon from Quick Settings",
         "Added spellbook dropdown for easy spell rule management",
+        "Added priority display [number] in spell list for quick visibility",
         "Added primary icon indicator in RADIUS preview mode",
         "Preview mode now uses your spell rules instead of default spells",
         "Display Mode now auto-sets anchor and growth direction defaults",
-        "Moved 'Disable All Spell Rules' to Advanced tab",
+        "Spell list now sorted by priority (higher first), then alphabetically",
       },
-      fixes = {},
+      fixes = {
+        "Fixed icon arrangement when switching between Show Behavior modes",
+        "Fixed alpha state restoration when switching to On Cooldown mode",
+        "Smoother priority slider with debounced updates",
+      },
     },
     ["2.0.4"] = {
       breakingChanges = {},

@@ -1050,6 +1050,11 @@ local function ApplyShowBehavior()
     if iconFrame then
       local isOnCooldown = iconFrame.cooldown:IsShown()
 
+      -- Reset alpha in case it was modified in OFF_COOLDOWN mode
+      if isOnCooldown then
+        iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+      end
+
       if showBehavior == SHOW_BEHAVIOR.ON_COOLDOWN then
         -- ON_COOLDOWN: icon should only be visible while on cooldown.
         -- Mark for removal once the cooldown ends.

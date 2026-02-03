@@ -296,13 +296,13 @@ local options = {
     -- ========================================
     quickSettings = {
       type = "group",
-      name = "Common Settings",
+      name = "Quick Settings",
       order = 0,
       args = {
 
         welcomeHeader = {
           type = "header",
-          name = "Common Settings",
+          name = "Quick Settings",
           order = 1,
         },
 
@@ -312,6 +312,39 @@ local options = {
               "These are the essential settings to get started!\n" ..
               "Configure these first, then explore other tabs for advanced options.",
           order = 2,
+        },
+
+        spacer0 = {
+          type = "description",
+          name = " ",
+          order = 3,
+        },
+
+        enabled = {
+          type = "toggle",
+          name = "Enable Addon",
+          desc = "Turn CooldownCursor on or off.\n\n" ..
+              "When disabled, no cooldown icons will appear at your cursor.",
+          order = 4,
+          width = "normal",
+          get = function() return CooldownCursor:GetDBValue("enabled") end,
+          set = function(_, v)
+            CooldownCursor:SetDBBoolean("enabled", v)
+            if not v then
+              CooldownCursor:HideIconNow()
+            end
+          end,
+        },
+
+        enabledWarning = {
+          type = "description",
+          name = function()
+            if CooldownCursor:GetDBValue("enabled") == false then
+              return "|cffff5555CooldownCursor is currently DISABLED.|r No cooldowns will appear at your cursor."
+            end
+            return ""
+          end,
+          order = 4.5,
         },
 
         spacer1 = {

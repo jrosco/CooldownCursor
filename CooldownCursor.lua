@@ -161,6 +161,7 @@ local spellRules = {
 }
 
 local defaults = {
+  enabled = true,
   offsetX = 0,
   offsetY = 0,
   scale = 1,
@@ -278,6 +279,7 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
         "Spells must now be explicitly added to rules to show cooldowns",
       },
       newFeatures = {
+        "Added ability to completely disable the addon from Quick Settings",
         "Added spellbook dropdown for easy spell rule management",
         "Moved 'Disable All Spell Rules' to Advanced tab",
       },
@@ -1114,7 +1116,10 @@ function CooldownCursor:GetNotes()
 end
 
 function CooldownCursor:GetDBValue(key)
-  return CooldownCursorDB[key] or defaults[key]
+  if CooldownCursorDB[key] ~= nil then
+    return CooldownCursorDB[key]
+  end
+  return defaults[key]
 end
 
 function CooldownCursor:SetDBString(key, value)
@@ -1479,6 +1484,11 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   end
 
   if SPELL_EVENTS[event] then
+    -- Check if addon is enabled
+    if CooldownCursorDB.enabled == false then
+      return
+    end
+
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
       return
     end

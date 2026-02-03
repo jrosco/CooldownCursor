@@ -1548,7 +1548,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
 
     -- Delay slightly to allow cooldown to register
-    C_Timer.After(0.05, function()
+    C_Timer.After(0.01, function()
       local durationObj = C_Spell.GetSpellCooldownDuration(spellID)
 
       if not durationObj then return end
@@ -1562,11 +1562,11 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       -- Check spells are known to player
       if not IsPlayerSpell(spellID) then return end
 
-      local usable = C_Spell.IsSpellUsable(spellID)
+      -- local usable = C_Spell.IsSpellUsable(spellID)
       local inRange = C_Spell.IsSpellInRange(spellID)
 
       -- Check spell usability
-      if (usable == false or inRange == false) and
+      if inRange == false and
           CooldownCursorDB.showBehavior ~= SHOW_BEHAVIOR.OFF_COOLDOWN then
         return
       end
@@ -1578,7 +1578,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       if durationObj then
         ShowSpellIcon(spellID, durationObj)
       end
-      
+
       ApplyShowBehavior()
     end)
   end

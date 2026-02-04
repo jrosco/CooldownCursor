@@ -50,6 +50,8 @@ local activeSpellID = nil
 local inCombat = false
 local fontsTable = {}
 local previewMouseMode = true
+local activeProcSpells = {}
+local procCapableSpells = {}
 
 -- Multi-icon state
 local iconPool = {}
@@ -150,6 +152,39 @@ local STACK_GROWTH = {
   COUNTERCLOCKWISE = "COUNTERCLOCKWISE",
 }
 
+-----------------------------------------------------
+--- Proc Overlay/Outline Atlas Settings
+-----------------------------------------------------
+local PROC_OVERLAY_ATLAS_SETTINGS = {
+  ["ArtifactsFX-SpinningGlowys"] = { name = "Spinning Glowys", scale = 1.5 },
+  ["AftLevelup-WhiteStarBurst"] = { name = "Star Burst", scale = 2 },
+  ["ArtifactsFX-Whirls"] = { name = "Whirls", scale = 1.4 },
+}
+
+local PROC_OUTLINE_ATLAS_SETTINGS = {
+  ["combattimeline-fx-queued"] = { name = "Square Neon Glow", scale = 1.6 },
+  ["combattimeline-fx-deadlyglow-base"] = { name = "Square Glow", scale = 1.6 },
+  ["talents-node-choiceflyout-square-ghost"] = { name = "Square Dotted", scale = 1.2 },
+}
+
+function CooldownCursor:GetProcOverlayAtlasSettings()
+  return PROC_OVERLAY_ATLAS_SETTINGS
+end
+
+function CooldownCursor:GetProcOutlineAtlasSettings()
+  return PROC_OUTLINE_ATLAS_SETTINGS
+end
+
+local function IsProcOverlayEnabled()
+  local atlas = CooldownCursorDB.procOverlayAtlas or defaults.procOverlayAtlas
+  return atlas and atlas ~= "" and atlas ~= "none"
+end
+
+local function IsProcOutlineEnabled()
+  local atlas = CooldownCursorDB.procOutlineAtlas or defaults.procOutlineAtlas
+  return atlas and atlas ~= "" and atlas ~= "none"
+end
+
 ----------------------------------------------------
 -- Live Preview state
 ----------------------------------------------------
@@ -173,6 +208,11 @@ local defaults = {
   scale = 1,
   iconSize = 48,
   iconAlpha = 100,
+  showProcs = false,
+  procOverlayAtlas = "none",
+  procOutlineAtlas = "combattimeline-fx-queued",
+  procOverlayColor = "#FFFFFF",
+  procOutlineColor = "#FFFFFF",
   iconHide = false,
   showSpellNames = false,
   hideCooldownNumbers = false,
@@ -280,6 +320,18 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- Notes are organized by version (newest first)
 
   local releaseNotesByVersion = {
+    ["2.2.0"] = {
+      newFeatures = {
+        "Proc Spell Support: Show spell icons when procs are active",
+        "Proc visual indicators with customizable overlay and border",
+      },
+      fixes = {},
+    },
+    ["2.1.2"] = {
+      fixes = {
+        "Minor bug fixes",
+      },
+    },
     ["2.1.1"] = {
       fixes = {
         "Fixed issue where some spell icons would show if not known by the player",
@@ -434,6 +486,28 @@ local function CreateIconFrame(index)
   iconFrame.primaryLabel:SetText("|cff00ff00PRIMARY|r")
   iconFrame.primaryLabel:Hide()
 
+  -- Proc overlay (SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
+  iconFrame.procOverlay = iconFrame:CreateTexture(nil, "OVERLAY")
+  local overlayAtlas = CooldownCursorDB.procOverlayAtlas or defaults.procOverlayAtlas
+  if IsProcOverlayEnabled() and overlayAtlas and overlayAtlas ~= "" then
+    iconFrame.procOverlay:SetAtlas(overlayAtlas, true)
+  end
+  iconFrame.procOverlay:SetBlendMode("ADD")
+  iconFrame.procOverlay:SetPoint("CENTER", iconFrame, "CENTER", 0, 0)
+  iconFrame.procOverlay:Hide()
+
+  -- Proc outline border
+  iconFrame.procOutline = iconFrame:CreateTexture(nil, "OVERLAY")
+  local outlineAtlas = CooldownCursorDB.procOutlineAtlas or defaults.procOutlineAtlas
+  if IsProcOutlineEnabled() and outlineAtlas and outlineAtlas ~= "" then
+    iconFrame.procOutline:SetAtlas(outlineAtlas, true)
+  end
+  iconFrame.procOutline:SetBlendMode("ADD")
+  iconFrame.procOutline:SetPoint("CENTER", iconFrame, "CENTER", 0, 0)
+  iconFrame.procOutline:SetAlpha(0.9)
+  iconFrame.procOutline:Hide()
+
+
   iconFrame.iconID = index
   iconFrame.spellID = nil
   iconFrame.addedTime = nil
@@ -441,6 +515,8 @@ local function CreateIconFrame(index)
   iconFrame.hideTimer = nil
   iconFrame.stackOffsetX = 0
   iconFrame.stackOffsetY = 0
+  iconFrame.procActive = false
+  iconFrame.procOnly = false
 
   return iconFrame
 end
@@ -483,6 +559,14 @@ function ReturnIconToPool(iconFrame)
   if iconFrame.primaryLabel then
     iconFrame.primaryLabel:Hide()
   end
+  if iconFrame.procOverlay then
+    iconFrame.procOverlay:Hide()
+  end
+  if iconFrame.procOutline then
+    iconFrame.procOutline:Hide()
+  end
+  iconFrame.procActive = false
+  iconFrame.procOnly = false
 
   if iconFrame.hideTimer then
     iconFrame.hideTimer:Cancel()
@@ -832,6 +916,29 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
     icon.text:SetTextColor(textr, textg, textb, textAlpha)
   end
 
+  if icon.procOverlay then
+    local showProcs = CooldownCursorDB.showProcs ~= false
+    local showOverlay = IsProcOverlayEnabled()
+    local overlayAtlas = CooldownCursorDB.procOverlayAtlas or defaults.procOverlayAtlas
+    if overlayAtlas and overlayAtlas ~= "" then
+      icon.procOverlay:SetAtlas(overlayAtlas, true)
+    end
+    local orr, org, orb = HexToRGB(CooldownCursorDB.procOverlayColor or defaults.procOverlayColor)
+    icon.procOverlay:SetVertexColor(orr, org, orb, 1)
+    icon.procOverlay:SetShown(showProcs and showOverlay and (icon.procActive == true))
+  end
+  if icon.procOutline then
+    local showProcs = CooldownCursorDB.showProcs ~= false
+    local showOutline = IsProcOutlineEnabled()
+    local outlineAtlas = CooldownCursorDB.procOutlineAtlas or defaults.procOutlineAtlas
+    if outlineAtlas and outlineAtlas ~= "" then
+      icon.procOutline:SetAtlas(outlineAtlas, true)
+    end
+    local otr, otg, otb = HexToRGB(CooldownCursorDB.procOutlineColor or defaults.procOutlineColor)
+    icon.procOutline:SetVertexColor(otr, otg, otb, 1)
+    icon.procOutline:SetShown(showProcs and showOutline and (icon.procActive == true))
+  end
+
   local anchorPoint = SPELL_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.spellTextAnchor)]
       or SPELL_TEXT_ANCHOR_POINTS[string.upper(defaults.spellTextAnchor)]
   icon.text:ClearAllPoints()
@@ -842,6 +949,22 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
   icon:SetSize(size * scale, size * scale)
   icon.text:SetScale(scale)
   icon.cooldown:SetScale(scale)
+  if icon.procOverlay then
+    local overlayAtlas = CooldownCursorDB.procOverlayAtlas or defaults.procOverlayAtlas
+    local overlayScale = 1.6
+    if overlayAtlas and PROC_OVERLAY_ATLAS_SETTINGS[overlayAtlas] then
+      overlayScale = PROC_OVERLAY_ATLAS_SETTINGS[overlayAtlas].scale or overlayScale
+    end
+    icon.procOverlay:SetSize(size * scale * overlayScale, size * scale * overlayScale)
+  end
+  if icon.procOutline then
+    local outlineAtlas = CooldownCursorDB.procOutlineAtlas or defaults.procOutlineAtlas
+    local outlineScale = 1.9
+    if outlineAtlas and PROC_OUTLINE_ATLAS_SETTINGS[outlineAtlas] then
+      outlineScale = PROC_OUTLINE_ATLAS_SETTINGS[outlineAtlas].scale or outlineScale
+    end
+    icon.procOutline:SetSize(size * scale * outlineScale, size * scale * outlineScale)
+  end
 
   icon.cooldown:SetHideCountdownNumbers(CooldownCursorDB.hideCooldownNumbers)
   icon.cooldown:SetDrawSwipe(CooldownCursorDB.showCooldownSwipe)
@@ -1046,12 +1169,13 @@ end
 ----------------------------------------------------
 -- Icon Setup Helper
 ----------------------------------------------------
-local function SetupNewIcon(spellID, spellInfo, durationObject)
+local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
   local iconFrame = GetIconFromPool()
   if not iconFrame then return nil, nil end
 
   local _, rule = CooldownCursor:GetSpellRule(spellID)
   local priority = (rule and rule.priority) or 0
+  local procActive = activeProcSpells[spellID] or false
 
   local iconData = {
     spellID = spellID,
@@ -1060,6 +1184,8 @@ local function SetupNewIcon(spellID, spellInfo, durationObject)
     spellName = spellInfo.name,
     addedTime = GetTime(),
     priority = priority,
+    procActive = procActive,
+    procOnly = fromProc == true,
   }
 
   activeIcons[spellID] = iconData
@@ -1068,6 +1194,8 @@ local function SetupNewIcon(spellID, spellInfo, durationObject)
   iconFrame.spellID = spellID
   iconFrame.addedTime = iconData.addedTime
   iconFrame.priority = priority
+  iconFrame.procActive = procActive
+  iconFrame.procOnly = fromProc == true
 
   CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
 
@@ -1090,6 +1218,16 @@ local function SetupNewIcon(spellID, spellInfo, durationObject)
   iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha))
   iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
   iconFrame:Show()
+  if iconFrame.procOverlay then
+    local showProcs = CooldownCursorDB.showProcs ~= false
+    local showOverlay = IsProcOverlayEnabled()
+    iconFrame.procOverlay:SetShown(showProcs and showOverlay and procActive)
+  end
+  if iconFrame.procOutline then
+    local showProcs = CooldownCursorDB.showProcs ~= false
+    local showOutline = IsProcOutlineEnabled()
+    iconFrame.procOutline:SetShown(showProcs and showOutline and procActive)
+  end
 
   return iconFrame, iconData
 end
@@ -1097,14 +1235,14 @@ end
 ----------------------------------------------------
 -- Show icon + cooldown
 ----------------------------------------------------
-local function ShowSpellIcon(spellID, durationObject)
+local function ShowSpellIcon(spellID, durationObject, fromProc)
   -- Don't create icons if addon is disabled
   if CooldownCursorDB.enabled == false then
-    return
+    return nil, nil
   end
 
   local spellInfo = C_Spell.GetSpellInfo(spellID)
-  if not spellInfo or not spellInfo.iconID then return end
+  if not spellInfo or not spellInfo.iconID then return nil, nil end
 
   local stackDirection = CooldownCursorDB.stackDirection or defaults.stackDirection
   local isSingleMode = (stackDirection == STACK_DIRECTION.SINGLE)
@@ -1117,11 +1255,11 @@ local function ShowSpellIcon(spellID, durationObject)
       end
     end
 
-    local iconFrame = SetupNewIcon(spellID, spellInfo, durationObject)
+    local iconFrame, iconData = SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
     if iconFrame then
       ScheduleHideTimerForIcon(iconFrame, spellID)
     end
-    return
+    return iconFrame, iconData
   end
 
   if CooldownCursor:IsMultiIconEnabled() then
@@ -1131,20 +1269,40 @@ local function ShowSpellIcon(spellID, durationObject)
       local iconFrame = existingIcon.iconFrame
       iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
       existingIcon.durationObject = durationObject
+      if not fromProc then
+        existingIcon.procOnly = false
+        iconFrame.procOnly = false
+      end
+      if activeProcSpells[spellID] and CooldownCursorDB.showProcs ~= false then
+        existingIcon.procActive = true
+        iconFrame.procActive = true
+        if iconFrame.procOverlay then
+          if IsProcOverlayEnabled() then
+            iconFrame.procOverlay:Show()
+          else
+            iconFrame.procOverlay:Hide()
+          end
+        end
+        if iconFrame.procOutline and IsProcOutlineEnabled() then
+          iconFrame.procOutline:Show()
+        end
+      end
       ScheduleHideTimerForIcon(iconFrame, spellID)
       SortIcons()
       UpdateIconPositions()
-      return -- caller will run ApplyShowBehavior() after us
+      return iconFrame, existingIcon -- caller will run ApplyShowBehavior() after us
     end
 
-    local iconFrame = SetupNewIcon(spellID, spellInfo, durationObject)
+    local iconFrame, iconData = SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
     if iconFrame then
       SortIcons()
       UpdateIconPositions()
       EnforceMaxIcons()
       ScheduleHideTimerForIcon(iconFrame, spellID)
     end
+    return iconFrame, iconData
   end
+  return nil, nil
 end
 
 ----------------------------------------------------
@@ -1163,6 +1321,21 @@ local function ApplyShowBehavior()
 
   -- AUTO_HIDE_AFTER - nothing extra to do here
   if showBehavior == SHOW_BEHAVIOR.AUTO_HIDE_AFTER then
+    -- If a spell can proc, only show it while the proc is active
+    if CooldownCursorDB.showProcs ~= false then
+      for spellID, iconData in pairs(activeIcons) do
+        local iconFrame = iconData.iconFrame
+        if iconFrame and procCapableSpells[spellID] then
+          local isProcActive = iconData.procActive or iconFrame.procActive
+          if isProcActive then
+            iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+          else
+            iconFrame:SetAlpha(0)
+          end
+        end
+      end
+      UpdateIconPositions()
+    end
     return
   end
 
@@ -1173,9 +1346,13 @@ local function ApplyShowBehavior()
     local rules = CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules
     if rules then
       for spellID, rule in pairs(rules) do
-        if rule.enabled ~= false and not activeIcons[spellID] and IsPlayerSpell(spellID) then
+        -- If spell has no cooldown and user doesn't want to show procs, skip it
+        if not CooldownCursorDB.showProcs and GetSpellBaseCooldown(spellID) == 0 then
+          return
+        end
+        if rule.enabled ~= false and not activeIcons[spellID] and type(spellID) == "number" then
           local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
-          if durationObject then
+          if durationObject and IsPlayerSpell(spellID) then
             ShowSpellIcon(spellID, durationObject)
           end
         end
@@ -1192,22 +1369,27 @@ local function ApplyShowBehavior()
     local iconFrame = iconData.iconFrame
     if iconFrame then
       local isOnCooldown = iconFrame.cooldown:IsShown()
+      local isProcActive = (CooldownCursorDB.showProcs ~= false) and (iconData.procActive or iconFrame.procActive)
 
       -- Reset alpha in case it was modified in OFF_COOLDOWN mode
-      if isOnCooldown then
+      if isOnCooldown or isProcActive then
         iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
       end
 
       if showBehavior == SHOW_BEHAVIOR.ON_COOLDOWN then
         -- ON_COOLDOWN: icon should only be visible while on cooldown.
         -- Mark for removal once the cooldown ends.
-        if not isOnCooldown then
+        if not isOnCooldown and not isProcActive then
           table.insert(toRemove, spellID)
         end
       elseif showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN then
         -- OFF_COOLDOWN: icon should only be visible when ready.
         -- Use SetAlpha so the cooldown frame stays alive and keeps updating.
-        if isOnCooldown then
+        if (CooldownCursorDB.showProcs ~= false) and procCapableSpells[spellID] and not isProcActive then
+          iconFrame:SetAlpha(0)
+        elseif isProcActive then
+          iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+        elseif isOnCooldown then
           iconFrame:SetAlpha(0)
         else
           iconFrame:SetAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
@@ -1310,6 +1492,32 @@ end
 function CooldownCursor:SetDBBoolean(key, value)
   CooldownCursorDB[key] = value and true or false
   self:UpdateDisplay()
+end
+
+function CooldownCursor:ClearProcStates(removeProcOnly)
+  activeProcSpells = {}
+  procCapableSpells = {}
+  local toRemove = {}
+
+  for spellID, iconData in pairs(activeIcons) do
+    iconData.procActive = false
+    if iconData.iconFrame then
+      iconData.iconFrame.procActive = false
+      if iconData.iconFrame.procOverlay then
+        iconData.iconFrame.procOverlay:Hide()
+      end
+      if iconData.iconFrame.procOutline then
+        iconData.iconFrame.procOutline:Hide()
+      end
+    end
+    if removeProcOnly and iconData.procOnly then
+      table.insert(toRemove, spellID)
+    end
+  end
+
+  for _, spellID in ipairs(toRemove) do
+    RemoveIconForSpell(spellID, true)
+  end
 end
 
 function CooldownCursor:AddOrUpdateSpellRule(spellID, ruleData)
@@ -1554,10 +1762,32 @@ function CooldownCursor:Preview()
     return
   end
 
+  local function ApplyPreviewProc(iconFrame, iconData)
+    if not iconFrame or not iconData then return end
+    if CooldownCursorDB.showProcs == false then return end
+    iconData.procActive = true
+    iconFrame.procActive = true
+    if iconFrame.procOverlay then
+      if IsProcOverlayEnabled() then
+        iconFrame.procOverlay:Show()
+      else
+        iconFrame.procOverlay:Hide()
+      end
+    end
+    if iconFrame.procOutline then
+      if IsProcOutlineEnabled() then
+        iconFrame.procOutline:Show()
+      else
+        iconFrame.procOutline:Hide()
+      end
+    end
+  end
+
   local function ShowPreviewIcon()
     local durationObj = C_DurationUtil.CreateDuration()
     durationObj:SetTimeFromStart(GetTime(), 30)
-    ShowSpellIcon(116, durationObj) -- Frostbolt
+    local iconFrame, iconData = ShowSpellIcon(116, durationObj) -- Frostbolt
+    ApplyPreviewProc(iconFrame, iconData)
     self:ApplyPreviewPosition()
   end
 
@@ -1593,9 +1823,9 @@ function CooldownCursor:PreviewMultiIcon()
     if rules and next(rules) then
       -- Use spells from user's spell rules
       for spellID, rule in pairs(rules) do
-        if rule.enabled ~= false and IsPlayerSpell(spellID) then
+        if rule.enabled ~= false and type(spellID) == "number" then
           local info = C_Spell.GetSpellInfo(spellID)
-          if info then
+          if info and IsPlayerSpell(spellID) then
             table.insert(previewSpells, {
               id = spellID,
               duration = 30 + (#previewSpells * 5), -- Vary durations
@@ -1619,6 +1849,27 @@ function CooldownCursor:PreviewMultiIcon()
     return previewSpells
   end
 
+  local function ApplyPreviewProc(iconFrame, iconData)
+    if not iconFrame or not iconData then return end
+    if CooldownCursorDB.showProcs == false then return end
+    iconData.procActive = true
+    iconFrame.procActive = true
+    if iconFrame.procOverlay then
+      if IsProcOverlayEnabled() then
+        iconFrame.procOverlay:Show()
+      else
+        iconFrame.procOverlay:Hide()
+      end
+    end
+    if iconFrame.procOutline then
+      if IsProcOutlineEnabled() then
+        iconFrame.procOutline:Show()
+      else
+        iconFrame.procOutline:Hide()
+      end
+    end
+  end
+
   local function ShowPreviewIcons()
     local maxIcons = self:GetDBValue("maxIcons")
     local spellPool = GetPreviewSpells()
@@ -1628,7 +1879,8 @@ function CooldownCursor:PreviewMultiIcon()
       local spellData = spellPool[i]
       local durationObj = C_DurationUtil.CreateDuration()
       durationObj:SetTimeFromStart(GetTime(), spellData.duration)
-      ShowSpellIcon(spellData.id, durationObj)
+      local iconFrame, iconData = ShowSpellIcon(spellData.id, durationObj)
+      ApplyPreviewProc(iconFrame, iconData)
     end
     self:ApplyPreviewPosition()
   end
@@ -1674,7 +1926,6 @@ end
 -- Event handler
 ----------------------------------------------------
 CooldownCursor:SetScript("OnEvent", function(self, event, ...)
-  local spellID
   local unit
   local SPELL_EVENTS = {
     UNIT_SPELLCAST_FAILED = true,
@@ -1693,6 +1944,63 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     self:UnregisterEvent("ADDON_LOADED")
     return
   end
+
+  if event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
+    local spellID = ...
+    if not spellID then return end
+    if CooldownCursorDB.showProcs == false then return end
+    if not IsPlayerSpell(spellID) then return end
+    local show = CooldownCursor:GetSpellRule(spellID)
+    if not show then return end
+    activeProcSpells[spellID] = true
+    procCapableSpells[spellID] = true
+    local durationObj = C_Spell.GetSpellCooldownDuration(spellID)
+    local hadIcon = activeIcons[spellID] ~= nil
+    local iconFrame, iconData = ShowSpellIcon(spellID, durationObj, true)
+    if iconFrame and iconData then
+      iconData.procActive = true
+      iconFrame.procActive = true
+      if not hadIcon then
+        iconData.procOnly = true
+        iconFrame.procOnly = true
+      end
+      if iconFrame.procOverlay then
+        if IsProcOverlayEnabled() then
+          iconFrame.procOverlay:Show()
+        else
+          iconFrame.procOverlay:Hide()
+        end
+      end
+      if iconFrame.procOutline and IsProcOutlineEnabled() then
+        iconFrame.procOutline:Show()
+      end
+    end
+    return
+  end
+
+  if event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
+    local spellID = ...
+    if not spellID then return end
+    if CooldownCursorDB.showProcs == false then return end
+    activeProcSpells[spellID] = nil
+    local iconData = activeIcons[spellID]
+    if iconData and iconData.iconFrame then
+      local iconFrame = iconData.iconFrame
+      iconData.procActive = false
+      iconFrame.procActive = false
+      if iconFrame.procOverlay then
+        iconFrame.procOverlay:Hide()
+      end
+      if iconFrame.procOutline then
+        iconFrame.procOutline:Hide()
+      end
+      if iconData.procOnly then
+        RemoveIconForSpell(spellID, true)
+      end
+    end
+    return
+  end
+
   if event == "PLAYER_REGEN_DISABLED" then
     -- Entering combat
     inCombat = true
@@ -1722,6 +2030,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   end
 
   if SPELL_EVENTS[event] then
+    local spellID
     -- Check if addon is enabled
     if CooldownCursorDB.enabled == false then
       return
@@ -1781,6 +2090,10 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       local show, rule = CooldownCursor:GetSpellRule(spellID)
       if not show then return end
 
+      -- If spell has no cooldown and user doesn't want to show procs, skip it
+      if not CooldownCursorDB.showProcs and GetSpellBaseCooldown(spellID) == 0 then
+        return
+      end
       if durationObj then
         ShowSpellIcon(spellID, durationObj)
       end
@@ -1801,3 +2114,7 @@ CooldownCursor:RegisterEvent("SPELL_UPDATE_USABLE")
 CooldownCursor:RegisterEvent("UNIT_SPELLCAST_FAILED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_DISABLED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_ENABLED")
+CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
+CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
+
+

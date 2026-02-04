@@ -280,6 +280,11 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- Notes are organized by version (newest first)
 
   local releaseNotesByVersion = {
+    ["2.1.2"] = {
+      fixes = {
+        "Minor bug fixes",
+      },
+    },
     ["2.1.1"] = {
       fixes = {
         "Fixed issue where some spell icons would show if not known by the player",
@@ -1173,9 +1178,9 @@ local function ApplyShowBehavior()
     local rules = CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules
     if rules then
       for spellID, rule in pairs(rules) do
-        if rule.enabled ~= false and not activeIcons[spellID] and IsPlayerSpell(spellID) then
+        if rule.enabled ~= false and not activeIcons[spellID] and type(spellID) == "number" then
           local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
-          if durationObject then
+          if durationObject and IsPlayerSpell(spellID) then
             ShowSpellIcon(spellID, durationObject)
           end
         end
@@ -1593,9 +1598,9 @@ function CooldownCursor:PreviewMultiIcon()
     if rules and next(rules) then
       -- Use spells from user's spell rules
       for spellID, rule in pairs(rules) do
-        if rule.enabled ~= false and IsPlayerSpell(spellID) then
+        if rule.enabled ~= false and type(spellID) == "number" then
           local info = C_Spell.GetSpellInfo(spellID)
-          if info then
+          if info and IsPlayerSpell(spellID) then
             table.insert(previewSpells, {
               id = spellID,
               duration = 30 + (#previewSpells * 5), -- Vary durations

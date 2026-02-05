@@ -1466,13 +1466,18 @@ local function ApplyShowBehavior()
       elseif showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN then
         -- OFF_COOLDOWN: icon should only be visible when ready.
         -- Use SetAlpha so the cooldown frame stays alive and keeps updating.
-        if (CooldownCursorDB.showProcs ~= false) and procCapableSpells[spellID] and not isProcActive then
-          iconFrame:SetAlpha(0)
-        elseif isProcActive then
+        local procOnlySpell = procCapableSpells[spellID] and GetSpellBaseCooldown(spellID) == 0
+        if isProcActive then
+          -- Proc is active - always show
           iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+        elseif procOnlySpell and (CooldownCursorDB.showProcs ~= false) then
+          -- Proc-only spell (no cooldown) not currently proccing - hide
+          iconFrame:SetAlpha(0)
         elseif isOnCooldown then
+          -- On cooldown - hide
           iconFrame:SetAlpha(0)
         else
+          -- Off cooldown and ready - show
           iconFrame:SetAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
         end
       end
@@ -2037,7 +2042,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     local spellID = ...
     if not spellID then return end
     if CooldownCursorDB.showProcs == false then return end
-    if not IsPlayerSpell(spellID) then return end
+
     local show = CooldownCursor:GetSpellRule(spellID)
     if not show then return end
     activeProcSpells[spellID] = true
@@ -2150,6 +2155,10 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       ApplyShowBehavior()
     end
 
+    -- Check user spell rules before doing any cooldown queries
+    local show, _ = CooldownCursor:GetSpellRule(spellID)
+    if not show then return end
+
     -- Delay slightly to allow cooldown to register
     C_Timer.After(0.01, function()
       local durationObj = C_Spell.GetSpellCooldownDuration(spellID)
@@ -2162,9 +2171,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
         return
       end
 
-      -- Check spells are known to player
-      if not IsPlayerSpell(spellID) then return end
-
       -- local usable = C_Spell.IsSpellUsable(spellID)
       local inRange = C_Spell.IsSpellInRange(spellID)
 
@@ -2174,13 +2180,12 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
         return
       end
 
-      -- Check user spell rules
-      local show, rule = CooldownCursor:GetSpellRule(spellID)
-      if not show then return end
-
-      -- If spell has no cooldown and user doesn't want to show procs, skip it
-      if not CooldownCursorDB.showProcs and GetSpellBaseCooldown(spellID) == 0 then
-        return
+      -- If spell has no base cooldown, it's a proc spell
+      -- Only show it if procs are enabled AND the spell is currently proccing
+      if GetSpellBaseCooldown(spellID) == 0 then
+        if not CooldownCursorDB.showProcs or not activeProcSpells[spellID] then
+          return
+        end
       end
       if durationObj then
         ShowSpellIcon(spellID, durationObj)

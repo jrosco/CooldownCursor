@@ -279,6 +279,26 @@ local function ShowBehaviorValues()
   }
 end
 
+local function ProcOverlayAtlasValues()
+  local values = {}
+  local settings = CooldownCursor:GetProcOverlayAtlasSettings() or {}
+  values["none"] = "None"
+  for atlas, data in pairs(settings) do
+    values[atlas] = (data and data.name) or atlas
+  end
+  return values
+end
+
+local function ProcOutlineAtlasValues()
+  local values = {}
+  local settings = CooldownCursor:GetProcOutlineAtlasSettings() or {}
+  values["none"] = "None"
+  for atlas, data in pairs(settings) do
+    values[atlas] = (data and data.name) or atlas
+  end
+  return values
+end
+
 -- Helper to set smart defaults when Display Mode changes
 local function ApplyDisplayModeDefaults(newMode)
   if newMode == "HORIZONTAL" then
@@ -389,6 +409,23 @@ local options = {
             if not v then
               CooldownCursor:HideIconNow()
             end
+          end,
+        },
+
+        showProcs = {
+          type = "toggle",
+          name = "Show Procs",
+          desc = "Enable proc detection for spells that can glow.\n\n" ..
+              "If disabled, proc visuals are hidden and proc-only icons are hidden.",
+          order = 4.1,
+          width = "normal",
+          get = function() return CooldownCursor:GetDBValue("showProcs") end,
+          set = function(_, v)
+            CooldownCursor:SetDBBoolean("showProcs", v)
+            if not v then
+              CooldownCursor:ClearProcStates(true)
+            end
+            CooldownCursor:UpdateDisplay()
           end,
         },
 
@@ -683,11 +720,62 @@ local options = {
           type = "toggle",
           name = "Pop Animation",
           desc = "Icons briefly scale up when they appear.",
-          order = 50,
+          order = 54,
           width = "normal",
           get = function() return CooldownCursor:GetDBValue("animation") end,
           set = function(_, v) CooldownCursor:SetDBBoolean("animation", v) end,
         },
+
+        procOverlayAtlas = {
+          type = "select",
+          name = "Proc Overlay Atlas",
+          desc = "Select the atlas used for the proc overlay glow.",
+          order = 50,
+          width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,
+          values = ProcOverlayAtlasValues(),
+          get = function() return CooldownCursor:GetDBValue("procOverlayAtlas") end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("procOverlayAtlas", v)
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
+        procOverlayColor = {
+          type = "color",
+          name = "Proc Overlay Color",
+          desc = "Tint color for the proc overlay glow.",
+          order = 50.5,
+          disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,
+          get = function() return HexColorGet("procOverlayColor", "FFFFFF") end,
+          set = function(_, r, g, b, a) HexColorSet("procOverlayColor", r, g, b, a) end,
+        },
+
+        procOutlineAtlas = {
+          type = "select",
+          name = "Proc Outline Atlas",
+          desc = "Select the atlas used for the proc outline border.",
+          order = 51,
+          width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,
+          values = ProcOutlineAtlasValues(),
+          get = function() return CooldownCursor:GetDBValue("procOutlineAtlas") end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("procOutlineAtlas", v)
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
+        procOutlineColor = {
+          type = "color",
+          name = "Proc Outline Color",
+          desc = "Tint color for the proc outline border.",
+          order = 51.5,
+          disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,
+          get = function() return HexColorGet("procOutlineColor", "FFFFFF") end,
+          set = function(_, r, g, b, a) HexColorSet("procOutlineColor", r, g, b, a) end,
+        },
+
 
         fadeOutDuration = {
           type = "range",
@@ -1265,7 +1353,7 @@ local options = {
               return { [0] = "|cff888888-- Not available in combat --|r" }
             end
             local values = { [0] = "|cff888888-- Select a spell --|r" }
-            local spells = CooldownCursor:GetCooldownSpells(true, 1.5, true)
+            local spells = CooldownCursor:GetCooldownSpells(true, 0, true)
 
             for _, spell in ipairs(spells) do
               if spell.spellID and spell.name then
@@ -1283,7 +1371,7 @@ local options = {
           end,
           sorting = function()
             -- Return spellIDs sorted alphabetically by spell name
-            local spells = CooldownCursor:GetCooldownSpells(true, 1.5, true)
+            local spells = CooldownCursor:GetCooldownSpells(true, 0, true)
             table.sort(spells, function(a, b)
               return (a.name or ""):lower() < (b.name or ""):lower()
             end)

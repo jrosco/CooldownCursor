@@ -289,9 +289,9 @@ end
 
 local function ShowBehaviorValues()
   return {
-    [0] = "Auto-Hide After",
-    [1] = "On Cooldown",
-    [2] = "Off Cooldown (Ready)",
+    [0] = "On Cooldown",
+    [1] = "Off Cooldown (Ready)",
+    [2] = "Auto-Hide After",
   }
 end
 
@@ -432,7 +432,8 @@ local options = {
           type = "toggle",
           name = "Show Procs",
           desc = "Enable proc detection for spells that can glow.\n\n" ..
-              "If disabled, proc visuals are hidden and proc-only icons are hidden.",
+              "If disabled, proc visuals are hidden and proc-only icons are hidden.\n\n" .. 
+              "|cffff0000NOTE: Spells must be added to the Spell Rules|r",
           order = 4.1,
           width = "normal",
           get = function() return CooldownCursor:GetDBValue("showProcs") end,
@@ -519,10 +520,10 @@ local options = {
 
         showBehavior = {
           type = "select",
-          name = "Show Behavior |cff345BFF(Experimental)|r",
-          desc = "On Cooldown |cffFF1E34(Experimental)|r - Icons appear when a spell goes on cooldown.\n\n" ..
-              "Off Cooldown |cffFF1E34(Experimental)|r - Icons appear when a spell comes off cooldown and is ready to use again.\n\n" ..
-              "Auto-Hide After |cffFFFFFF(Default/Legacy)|r - Icons appear when a spell goes on cooldown and automatically disappear after a set time. See 'Auto-Hide After' option.",
+          name = "Show Behavior",
+          desc = "On Cooldown - Icons appear when a spell goes on cooldown.\n\n" ..
+              "Off Cooldown - Icons appear when a spell comes off cooldown and is ready to use again.\n\n" ..
+              "Auto-Hide After - Icons appear when a spell goes on cooldown and automatically disappear after a set time. See 'Auto-Hide After' option.",
           order = 25,
           width = "normal",
           values = ShowBehaviorValues(),
@@ -543,7 +544,7 @@ local options = {
           max = 120,
           step = 1,
           disabled = function()
-            return CooldownCursor:GetDBValue("showBehavior") ~= 0
+            return CooldownCursor:GetDBValue("showBehavior") ~= 2
           end,
           get = function() return CooldownCursor:GetDBValue("hideAfter") end,
           set = function(_, v) CooldownCursor:SetHideAfter(v) end,
@@ -745,7 +746,7 @@ local options = {
         procOverlayAtlas = {
           type = "select",
           name = "Proc Overlay Atlas",
-          desc = "Select the atlas used for the proc overlay glow.",
+          desc = "Select the atlas used for the proc overlay glow.\n\nEnable 'Show Procs' in Quick Settings to see proc visuals and options.",
           order = 50,
           width = "normal",
           disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,
@@ -770,7 +771,7 @@ local options = {
         procOutlineAtlas = {
           type = "select",
           name = "Proc Outline Atlas",
-          desc = "Select the atlas used for the proc outline border.",
+          desc = "Select the atlas used for the proc outline border.\n\nEnable 'Show Procs' in Quick Settings to see proc visuals and options.",
           order = 51,
           width = "normal",
           disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,

@@ -66,9 +66,9 @@ local SHOW_WHEN_STATE = {
 }
 
 local SHOW_BEHAVIOR = {
-  AUTO_HIDE_AFTER = 0, -- Show on cooldown, auto-hide after X seconds (default, original behaviour)
-  ON_COOLDOWN = 1,     -- Show on cooldown, remove icon when spell comes off cooldown
-  OFF_COOLDOWN = 2,    -- Show only when spell is ready (off cooldown)
+  ON_COOLDOWN = 0,     -- Show on cooldown, remove icon when spell comes off cooldown
+  OFF_COOLDOWN = 1,    -- Show only when spell is ready (off cooldown)
+  AUTO_HIDE_AFTER = 3, -- Show on cooldown, auto-hide after X seconds (default, original behaviour)
 }
 
 local ANCHOR_POSITION = {
@@ -221,7 +221,7 @@ local defaults = {
   animation = false,
   fadeOutDuration = 0,
   showWhen = SHOW_WHEN_STATE.COMBAT,
-  showBehavior = SHOW_BEHAVIOR.AUTO_HIDE_AFTER,
+  showBehavior = SHOW_BEHAVIOR.ON_COOLDOWN,
   hideWhileMounted = false,
   anchor = ANCHOR_POSITION.TOPRIGHT,
   anchorPadding = 2,
@@ -1433,7 +1433,7 @@ local function ApplyShowBehavior()
           -- continue to next spell (can't use continue in Lua, so we use a nested if)
         elseif rule.enabled ~= false and not activeIcons[spellID] and C_SpellBook.IsSpellKnown(spellID) then
           local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
-          if durationObject and IsPlayerSpell(spellID) then
+          if durationObject then
             ShowSpellIcon(spellID, durationObject)
           end
         end
@@ -1637,11 +1637,11 @@ end
 
 function CooldownCursor:GetEffectiveIconSize(spellID)
   local globalSize = self:GetDBValue("iconSize")
-  local rulesData = CooldownCursorDB.spellRules
+  local classRules = GetClassRules()
 
-  if not rulesData or not rulesData.rules then return globalSize end
+  if not classRules then return globalSize end
 
-  local rule = rulesData.rules[spellID]
+  local rule = classRules[spellID]
   if not rule then return globalSize end
 
   if rule.useGlobalIconSize ~= false then return globalSize end
@@ -1913,7 +1913,7 @@ function CooldownCursor:PreviewMultiIcon()
       for spellID, rule in pairs(classRules) do
         if rule.enabled ~= false and C_SpellBook.IsSpellKnown(spellID) then
           local info = C_Spell.GetSpellInfo(spellID)
-          if info and IsPlayerSpell(spellID) then
+          if info then
             table.insert(previewSpells, {
               id = spellID,
               duration = 30 + (#previewSpells * 5), -- Vary durations

@@ -308,6 +308,54 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
     CooldownCursorDB._migratedWhitelist = true
   end
   ----------------------------------------------------------------------------------
+
+  ----------------------------------------------------------------------------------
+  -- migration v2.2.0 - Migrate old flat spell rules to class-based format ---------
+  -- Old format: rules[spellID] = {...}
+  -- New format: rules[CLASS][spellID] = {...}
+  -- This runs incrementally per character - only migrates spells the character knows
+  if not CooldownCursorDB._cleanedFlatRules then
+    local rules = CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules
+    if rules then
+      local _, class = UnitClass("player")
+      local migratedCount = 0
+      local remainingCount = 0
+
+      -- First pass: migrate spells this character knows to their class
+      for key, ruleData in pairs(rules) do
+        if type(key) == "number" then
+          local spellID = key
+          if C_SpellBook.IsSpellKnown(spellID) and class then
+            -- This character knows this spell - migrate to class format
+            if not rules[class] then
+              rules[class] = {}
+            end
+            -- Only migrate if not already in class rules
+            if not rules[class][spellID] then
+              rules[class][spellID] = ruleData
+            end
+            rules[spellID] = nil -- Remove from old format
+            migratedCount = migratedCount + 1
+          else
+            -- This character doesn't know this spell - leave for another alt
+            remainingCount = remainingCount + 1
+          end
+        end
+      end
+
+      -- Only mark as done when no old-format rules remain
+      if remainingCount == 0 then
+        CooldownCursorDB._cleanedFlatRules = true
+      end
+
+      if migratedCount > 0 then
+        print("|cff00ff00CooldownCursor:|r Migrated " .. migratedCount .. " spell rules to " .. (class or "unknown") .. " format.")
+      end
+    else
+      -- No rules exist, mark as done
+      CooldownCursorDB._cleanedFlatRules = true
+    end
+  end
   ----------------------------------------------------------------------------------
 
   CooldownCursorDB._version = major
@@ -321,23 +369,16 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
 
   local releaseNotesByVersion = {
     ["2.2.0"] = {
+      breakingChanges = {
+        "Spell rules are now saved per class - you may need to re-add spells on alt characters",
+      },
       newFeatures = {
         "Proc Spell Support: Show spell icons when procs are active",
         "Proc visual indicators with customizable overlay and border",
+        "Class-based Spell Rules: Each class now has its own separate spell rules",
+        "Spells not known to your current spec are automatically hidden",
       },
       fixes = {},
-    },
-    ["2.1.2"] = {
-      fixes = {
-        "Minor bug fixes",
-      },
-    },
-    ["2.1.1"] = {
-      fixes = {
-        "Fixed issue where some spell icons would show if not known by the player",
-        "|cffff0000Still some issue tracking Pet spells - investigating!|r",
-        "|cff00aaffWorking on a better spellbook rule UI.|r",
-      },
     },
     ["2.1.0"] = {
       breakingChanges = {
@@ -1147,23 +1188,64 @@ local function EnforceMaxIcons()
 end
 
 ----------------------------------------------------
+-- Player Class Helper
+----------------------------------------------------
+local playerClass = nil
+
+local function GetPlayerClass()
+  if not playerClass then
+    local _, classToken = UnitClass("player")
+    playerClass = classToken
+  end
+  return playerClass
+end
+
+----------------------------------------------------
 -- Spell Rule Logic
 ----------------------------------------------------
+
+-- Get the rules table for the current player's class
+local function GetClassRules()
+  local data = CooldownCursorDB.spellRules
+  if not data then return nil end
+
+  local class = GetPlayerClass()
+  if not class then return nil end
+
+  -- Initialize class rules table if needed
+  if not data.rules then
+    data.rules = {}
+  end
+  if not data.rules[class] then
+    data.rules[class] = {}
+  end
+
+  return data.rules[class]
+end
+
 function CooldownCursor:GetSpellRule(spellID)
   local data = CooldownCursorDB.spellRules
-  if not data or not data.rules then return false end
-  if data.settings.disableRules then return true end
+  if not data then return false end
+  if data.settings and data.settings.disableRules then return true end
 
-  local rules = data.rules
-  -- If no rules exist, don't show any spells
-  if not next(rules) then return false end
+  local classRules = GetClassRules()
+  -- If no rules exist for this class, don't show any spells
+  if not classRules or not next(classRules) then return false end
 
-  local rule = rules[spellID]
+  local rule = classRules[spellID]
   -- If spell is not in rules, don't show it
   if not rule then return false end
 
+  -- If spell is not known to the player (wrong spec, etc.), don't show it
+  if not C_SpellBook.IsSpellKnown(spellID) then return false end
+
   -- Return whether the spell is enabled
   return rule.enabled ~= false, rule
+end
+
+-- Expose GetPlayerClass for Options.lua
+function CooldownCursor:GetPlayerClass()
+  return GetPlayerClass()
 end
 
 ----------------------------------------------------
@@ -1343,14 +1425,13 @@ local function ApplyShowBehavior()
   -- We need the icons to exist so their cooldown frames stay current
   -- and we can check IsShown() on each event.
   if showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN then
-    local rules = CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules
-    if rules then
-      for spellID, rule in pairs(rules) do
+    local classRules = GetClassRules()
+    if classRules then
+      for spellID, rule in pairs(classRules) do
         -- If spell has no cooldown and user doesn't want to show procs, skip it
         if not CooldownCursorDB.showProcs and GetSpellBaseCooldown(spellID) == 0 then
-          return
-        end
-        if rule.enabled ~= false and not activeIcons[spellID] and type(spellID) == "number" then
+          -- continue to next spell (can't use continue in Lua, so we use a nested if)
+        elseif rule.enabled ~= false and not activeIcons[spellID] and C_SpellBook.IsSpellKnown(spellID) then
           local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
           if durationObject and IsPlayerSpell(spellID) then
             ShowSpellIcon(spellID, durationObject)
@@ -1531,19 +1612,24 @@ function CooldownCursor:AddOrUpdateSpellRule(spellID, ruleData)
   CooldownCursorDB.spellRules.settings = CooldownCursorDB.spellRules.settings or {}
   CooldownCursorDB.spellRules.rules = CooldownCursorDB.spellRules.rules or {}
 
-  local rules = CooldownCursorDB.spellRules.rules
-  rules[spellID] = rules[spellID] or {}
+  -- Get class-specific rules table
+  local classRules = GetClassRules()
+  if not classRules then return false, "Could not determine player class" end
+
+  classRules[spellID] = classRules[spellID] or {}
 
   for k, v in pairs(ruleData or {}) do
-    rules[spellID][k] = v
+    classRules[spellID][k] = v
   end
 
   return true, spellName
 end
 
 function CooldownCursor:RemoveSpellRule(spellID)
-  if not CooldownCursorDB.spellRules or not CooldownCursorDB.spellRules.rules then return end
-  CooldownCursorDB.spellRules.rules[spellID] = nil
+  local classRules = GetClassRules()
+  if not classRules then return end
+
+  classRules[spellID] = nil
   CooldownCursor:UpdateDisplay()
   CooldownCursor:RebuildSpellRuleOptions()
   CooldownCursor:NotifyOptionsChanged()
@@ -1818,12 +1904,14 @@ function CooldownCursor:PreviewMultiIcon()
   -- Build preview spell list from spell rules, or fall back to default pool
   local function GetPreviewSpells()
     local previewSpells = {}
-    local rules = CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules
 
-    if rules and next(rules) then
-      -- Use spells from user's spell rules
-      for spellID, rule in pairs(rules) do
-        if rule.enabled ~= false and type(spellID) == "number" then
+    -- Get class-specific rules
+    local classRules = GetClassRules()
+
+    if classRules and next(classRules) then
+      -- Use spells from user's class-specific spell rules
+      for spellID, rule in pairs(classRules) do
+        if rule.enabled ~= false and C_SpellBook.IsSpellKnown(spellID) then
           local info = C_Spell.GetSpellInfo(spellID)
           if info and IsPlayerSpell(spellID) then
             table.insert(previewSpells, {

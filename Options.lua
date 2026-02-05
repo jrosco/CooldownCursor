@@ -38,6 +38,21 @@ local function GetRuleDisplayColor(enabled)
   return "ff5555", "(disabled)"
 end
 
+-- Helper to get class-specific rules for the current player
+local function GetClassRulesForUI()
+  CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or {}
+  CooldownCursorDB.spellRules.rules = CooldownCursorDB.spellRules.rules or {}
+
+  local class = CooldownCursor:GetPlayerClass()
+  if not class then return {} end
+
+  if not CooldownCursorDB.spellRules.rules[class] then
+    CooldownCursorDB.spellRules.rules[class] = {}
+  end
+
+  return CooldownCursorDB.spellRules.rules[class]
+end
+
 function CooldownCursor:RebuildSpellRuleOptions()
   local group = self.options.args.spellRulesGroup
   local args = group.args
@@ -49,13 +64,14 @@ function CooldownCursor:RebuildSpellRuleOptions()
     end
   end
 
-  CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or { rules = {} }
+  -- Get class-specific rules
+  local classRules = GetClassRulesForUI()
 
   -- Build sortable list
   local sorted = {}
 
-  for spellID, rule in pairs(CooldownCursorDB.spellRules.rules) do
-    if type(spellID) == "number" and IsPlayerSpell(spellID) then
+  for spellID, rule in pairs(classRules) do
+    if type(spellID) == "number" and C_SpellBook.IsSpellKnown(spellID) then
       local info = C_Spell.GetSpellInfo(spellID)
       local name = info and info.name or ("SpellID " .. spellID)
       local icon = info and info.originalIconID or nil
@@ -1312,10 +1328,61 @@ local options = {
       order = 400,
       args = {
 
+        classHeader = {
+          type = "description",
+          name = function()
+            local class = CooldownCursor:GetPlayerClass()
+            if class then
+              -- Class colors (approximate WoW class colors)
+              local classColors = {
+                WARRIOR = "C69B6D",
+                PALADIN = "F48CBA",
+                HUNTER = "AAD372",
+                ROGUE = "FFF468",
+                PRIEST = "FFFFFF",
+                DEATHKNIGHT = "C41E3A",
+                SHAMAN = "0070DD",
+                MAGE = "3FC7EB",
+                WARLOCK = "8788EE",
+                MONK = "00FF98",
+                DRUID = "FF7C0A",
+                DEMONHUNTER = "A330C9",
+                EVOKER = "33937F",
+              }
+              local color = classColors[class] or "FFFFFF"
+              return string.format("|cff%s%s|r Spell Rules", color, class:gsub("^%l", string.upper):gsub("(%u)", " %1"):sub(2))
+            end
+            return "Spell Rules"
+          end,
+          fontSize = "large",
+          order = 399,
+        },
+
+        specHeader = {
+          type = "description",
+          name = function()
+            local specIndex = GetSpecialization()
+            if specIndex then
+              local _, specName, _, specIcon = GetSpecializationInfo(specIndex)
+              if specName then
+                local iconText = specIcon and string.format("|T%d:16:16:0:0|t ", specIcon) or ""
+                return string.format("%s|cffffff00%s|r Specialization", iconText, specName)
+              end
+            end
+            return ""
+          end,
+          fontSize = "medium",
+          order = 399.5,
+        },
+
         rulesDescription = {
           type = "description",
-          name = "Manage which spells show cooldowns at your cursor.\n\n" ..
-              "|cffaaaaaaTip: Only spells added to rules will show cooldowns. Add spells below to enable tracking.|r",
+          name = function()
+            local class = CooldownCursor:GetPlayerClass()
+            local classText = class and string.format(" for your |cffffd100%s|r", class:lower():gsub("^%l", string.upper)) or ""
+            return "Manage which spells show cooldowns at your cursor" .. classText .. ".\n\n" ..
+                "|cffaaaaaaTip: Spells not known to your current spec are automatically hidden.|r"
+          end,
           order = 400,
         },
 
@@ -1736,15 +1803,27 @@ local options = {
 
         clearAllSpellRules = {
           type = "execute",
-          name = "Clear All Spell Rules",
-          desc = "Remove all spell rules you have added.\n\n" ..
-              "|cffff8800Warning:|r This cannot be undone!",
+          name = function()
+            local class = CooldownCursor:GetPlayerClass()
+            if class then
+              return "Clear " .. class:gsub("^%l", string.upper):gsub("(%u)", " %1"):sub(2) .. " Spell Rules"
+            end
+            return "Clear All Spell Rules"
+          end,
+          desc = function()
+            local class = CooldownCursor:GetPlayerClass()
+            local classText = class and string.format(" for your %s", class:lower():gsub("^%l", string.upper)) or ""
+            return "Remove all spell rules" .. classText .. ".\n\n" ..
+                "|cffff8800Warning:|r This cannot be undone!"
+          end,
           order = 70,
           confirm = true,
-          confirmText = "Are you sure you want to delete ALL spell rules? This cannot be undone.",
+          confirmText = "Are you sure you want to delete ALL spell rules for this class? This cannot be undone.",
           func = function()
-            CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or {}
-            CooldownCursorDB.spellRules.rules = {}
+            local class = CooldownCursor:GetPlayerClass()
+            if class and CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules then
+              CooldownCursorDB.spellRules.rules[class] = {}
+            end
             CooldownCursor:RebuildSpellRuleOptions()
             CooldownCursor:NotifyOptionsChanged()
             CooldownCursor:UpdateDisplay()
@@ -1837,7 +1916,7 @@ CooldownCursor.options = options
 function CooldownCursor:OnOptionsOpened()
   -- Options Panel Opened
   CooldownCursor:HideIconNow()
-  self:RebuildSpellRuleOptions()
+  self:RebuildSpellRuleOptions() -- Refresh to show only known spells for current spec
   CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
 end
 

@@ -371,6 +371,14 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
     ["2.2.0"] = {
       breakingChanges = {
         "Spell rules are now saved per class - you may need to re-add spells on alt characters",
+      },
+      newFeatures = {
+        "Proc Spell Support: Show spell icons when procs are active",
+        "Proc visual indicators with customizable overlay and border",
+        "Class-based Spell Rules: Each class now has its own separate spell rules",
+        "Spells not known to your current spec are automatically hidden",
+      },
+    },
     ["2.1.3"] = {
       fixes = {
         "Fixed spell icons not showing when 'Show When' is set to 'Out of Combat' or 'Always'",
@@ -382,13 +390,6 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
       fixes = {
         "Minor bug fixes",
       },
-      newFeatures = {
-        "Proc Spell Support: Show spell icons when procs are active",
-        "Proc visual indicators with customizable overlay and border",
-        "Class-based Spell Rules: Each class now has its own separate spell rules",
-        "Spells not known to your current spec are automatically hidden",
-      },
-      fixes = {},
     },
     ["2.1.0"] = {
       breakingChanges = {

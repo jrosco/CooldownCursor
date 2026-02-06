@@ -221,6 +221,7 @@ local defaults = {
   iconSize = 48,
   iconAlpha = 100,
   showProcs = false,
+  showCharges = true,
   procOverlayAtlas = "none",
   procOutlineAtlas = "combattimeline-fx-queued",
   procOverlayColor = "#FFFFFF",
@@ -507,8 +508,11 @@ local function CreateIconFrame(index)
   iconFrame.text:SetPoint("BOTTOM", iconFrame, "TOP", 0, 4)
   iconFrame.text:Hide()
 
-  -- Charge count text (parented to cooldown frame so it draws above the swipe)
-  iconFrame.chargeText = iconFrame.cooldown:CreateFontString(nil, "OVERLAY")
+  -- Overlay frame for charge text (sits above cooldown swipe, independent of cooldown lifecycle)
+  iconFrame.chargeOverlay = CreateFrame("Frame", nil, iconFrame)
+  iconFrame.chargeOverlay:SetAllPoints(iconFrame)
+  iconFrame.chargeOverlay:SetFrameLevel(iconFrame.cooldown:GetFrameLevel() + 1)
+  iconFrame.chargeText = iconFrame.chargeOverlay:CreateFontString(nil, "OVERLAY")
   iconFrame.chargeText:Hide()
 
   iconFrame.showAnim = iconFrame:CreateAnimationGroup()
@@ -1298,6 +1302,11 @@ end
 local function UpdateChargeCount(iconFrame, spellID)
   if not iconFrame or not iconFrame.chargeText then return end
 
+  if CooldownCursorDB.showCharges == false then
+    iconFrame.chargeText:Hide()
+    return
+  end
+
   local chargeInfo = C_Spell.GetSpellCharges(spellID)
   if chargeInfo then
     iconFrame.chargeText:SetText(chargeInfo.currentCharges)
@@ -1311,7 +1320,6 @@ end
 -- Icon Setup Helper
 ----------------------------------------------------
 local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
-  print("Setting up new icon for spellID", spellID, "fromProc:", fromProc)
   local iconFrame = GetIconFromPool()
   if not iconFrame then return nil, nil end
 
@@ -1517,6 +1525,9 @@ local function ApplyShowBehavior()
       local isOnCooldown = iconFrame.cooldown:IsShown()
       local isProcActive = (CooldownCursorDB.showProcs ~= false) and (iconData.procActive or iconFrame.procActive)
 
+      -- Update charge count text
+      UpdateChargeCount(iconFrame, spellID)
+
       -- Reset alpha in case it was modified in OFF_COOLDOWN mode
       if isOnCooldown or isProcActive then
         iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
@@ -1539,8 +1550,13 @@ local function ApplyShowBehavior()
           -- Proc-only spell (no cooldown) not currently proccing - hide
           iconFrame:SetAlpha(0)
         elseif isOnCooldown then
-          -- On cooldown - hide
-          iconFrame:SetAlpha(0)
+          -- On cooldown - but if spell has charges available, still show it
+          local chargeInfo = CooldownCursorDB.showCharges ~= false and C_Spell.GetSpellCharges(spellID)
+          if chargeInfo and chargeInfo.currentCharges then
+            iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+          else
+            iconFrame:SetAlpha(0)
+          end
         else
           -- Off cooldown and ready - show
           iconFrame:SetAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
@@ -2216,11 +2232,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
     if not spellID then return end
 
-    if activeIcons[spellID] then
-      UpdateChargeCount(activeIcons[spellID].iconFrame, spellID)
-      ApplyShowBehavior()
-    end
-
     -- Check user spell rules before doing any cooldown queries
     local show, _ = CooldownCursor:GetSpellRule(spellID)
     if not show then return end
@@ -2228,22 +2239,13 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     -- Delay slightly to allow cooldown to register
     C_Timer.After(0.01, function()
       local durationObj = C_Spell.GetSpellCooldownDuration(spellID)
+      local hasCharges = C_Spell.GetSpellCharges(spellID) ~= nil
 
       if not durationObj then return end
 
       -- Filter out non-cooldown abilities (buffs, mounts, etc.).
       if durationObj and not durationObj:HasSecretValues()
           and durationObj:GetStartTime() == 0 then
-        return
-      end
-
-      -- If spell has charges, show the icon regardless of cooldown state and update charge count
-      local chargeInfo = C_Spell.GetSpellCharges(spellID)
-      if chargeInfo then
-        local iconFrame, iconData = ShowSpellIcon(spellID, durationObj)
-        if iconFrame and iconData then
-          UpdateChargeCount(iconFrame, spellID)
-        end 
         return
       end
 
@@ -2256,6 +2258,13 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
         return
       end
 
+      if hasCharges then
+        local iconFrame, _ = ShowSpellIcon(spellID, durationObj)
+        UpdateChargeCount(iconFrame, spellID)
+        ApplyShowBehavior()
+        return
+      end
+
       -- If spell has no base cooldown, it's a proc spell
       -- Only show it if procs are enabled AND the spell is currently proccing
       if GetSpellBaseCooldown(spellID) == 0 then
@@ -2263,6 +2272,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
           return
         end
       end
+
       if durationObj then
         ShowSpellIcon(spellID, durationObj)
       end

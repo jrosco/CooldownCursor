@@ -446,6 +446,19 @@ local options = {
           end,
         },
 
+        showCharges = {
+          type = "toggle",
+          name = "Show Charges",
+          desc = "Display the current charge count on spell icons for spells with multiple charges.",
+          order = 4.2,
+          width = "normal",
+          get = function() return CooldownCursor:GetDBValue("showCharges") end,
+          set = function(_, v)
+            CooldownCursor:SetDBBoolean("showCharges", v)
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
         enabledWarning = {
           type = "description",
           name = function()
@@ -1337,6 +1350,7 @@ local options = {
           max = 32,
           step = 1,
           width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
           get = function() return CooldownCursor:GetDBValue("chargeTextSize") end,
           set = function(_, v) CooldownCursor:SetDBNumber("chargeTextSize", v) end,
         },
@@ -1347,6 +1361,7 @@ local options = {
           desc = "Font used for the charge count text.",
           order = 130,
           width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
           values = FontValues,
           get = function() return CooldownCursor:GetDBValue("chargeTextFont") end,
           set = function(_, v) CooldownCursor:SetFontPath("chargeTextFont", v) end,
@@ -1358,6 +1373,7 @@ local options = {
           desc = "Font outline type for the charge count text.",
           order = 140,
           width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
           values = fontTypeValues,
           get = function() return CooldownCursor:GetDBValue("chargeTextFontType") end,
           set = function(_, v)
@@ -1371,6 +1387,7 @@ local options = {
           hasAlpha = false,
           order = 150,
           width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
           get = function() return HexColorGet("chargeTextColor", "FFFFFF") end,
           set = function(_, r, g, b, a) HexColorSet("chargeTextColor", r, g, b, a) end,
         },
@@ -1381,6 +1398,7 @@ local options = {
           desc = "Where to position the charge count on the icon.",
           order = 160,
           width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
           values = AnchorValues,
           get = function() return CooldownCursor:GetDBValue("chargeTextAnchor") end,
           set = function(_, v) CooldownCursor:SetDBString("chargeTextAnchor", v) end,

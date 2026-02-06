@@ -1748,14 +1748,12 @@ CooldownCursor.options = options
 
 function CooldownCursor:OnOptionsOpened()
   -- Options Panel Opened
-  CooldownCursor:HideIconNow()
   self:RebuildSpellRuleOptions()
   CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
 end
 
 function CooldownCursor:OnOptionsClosed()
   -- Options Panel Closed
-  CooldownCursor:HideIconNow()
   CooldownCursor:SetPreviewMouseMode(true)
 end
 

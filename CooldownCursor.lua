@@ -507,8 +507,8 @@ local function CreateIconFrame(index)
   iconFrame.text:SetPoint("BOTTOM", iconFrame, "TOP", 0, 4)
   iconFrame.text:Hide()
 
-  -- Charge count text
-  iconFrame.chargeText = iconFrame:CreateFontString(nil, "OVERLAY")
+  -- Charge count text (parented to cooldown frame so it draws above the swipe)
+  iconFrame.chargeText = iconFrame.cooldown:CreateFontString(nil, "OVERLAY")
   iconFrame.chargeText:Hide()
 
   iconFrame.showAnim = iconFrame:CreateAnimationGroup()

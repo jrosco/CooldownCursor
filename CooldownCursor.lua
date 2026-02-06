@@ -109,6 +109,18 @@ local SPELL_TEXT_ANCHOR_POINTS = {
   TOP = { point = "BOTTOM", relativeTo = "TOP", x = 0, y = 4 },
 }
 
+local CHARGE_TEXT_ANCHOR_POINTS = {
+  TOP = { point = "TOP", x = 0, y = -2 },
+  BOTTOM = { point = "BOTTOM", x = 0, y = 2 },
+  LEFT = { point = "LEFT", x = 2, y = 0 },
+  RIGHT = { point = "RIGHT", x = -2, y = 0 },
+  CENTER = { point = "CENTER", x = 0, y = 0 },
+  TOPLEFT = { point = "TOPLEFT", x = 2, y = -2 },
+  TOPRIGHT = { point = "TOPRIGHT", x = -2, y = -2 },
+  BOTTOMLEFT = { point = "BOTTOMLEFT", x = 2, y = 2 },
+  BOTTOMRIGHT = { point = "BOTTOMRIGHT", x = -2, y = 2 },
+}
+
 local FONT_TYPES = {
   NONE = nil,
   OUTLINE = "OUTLINE",
@@ -239,6 +251,13 @@ local defaults = {
   cooldownTextColor = "#FFFFFF",
   cooldownTextAnchor = CD_TEXT_ANCHOR_POINTS.CENTER.point,
   cooldownTextAlpha = 100,
+  chargeTextSize = 12,
+  chargeTextFont = "Friz Quadrata TT",
+  chargeTextFontPath = DEFAULT_SYSTEM_FONTS["Friz Quadrata TT"],
+  chargeTextFontType = FONT_TYPES.OUTLINE,
+  chargeTextColor = "#FFFFFF",
+  chargeTextAnchor = CHARGE_TEXT_ANCHOR_POINTS.BOTTOMRIGHT.point,
+  chargeTextAlpha = 100,
   frameStrata = FRAME_STRATA.HIGH,
   spellRules = spellRules,
 
@@ -488,9 +507,8 @@ local function CreateIconFrame(index)
   iconFrame.text:SetPoint("BOTTOM", iconFrame, "TOP", 0, 4)
   iconFrame.text:Hide()
 
-  -- Charge count text (bottom-right corner, like default WoW action bars)
-  iconFrame.chargeText = iconFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-  iconFrame.chargeText:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -2, 2)
+  -- Charge count text
+  iconFrame.chargeText = iconFrame:CreateFontString(nil, "OVERLAY")
   iconFrame.chargeText:Hide()
 
   iconFrame.showAnim = iconFrame:CreateAnimationGroup()
@@ -964,6 +982,23 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
     local textr, textg, textb = HexToRGB(CooldownCursorDB.spellTextColor or defaults.spellTextColor)
     local textAlpha = PercentToAlpha(CooldownCursorDB.spellTextAlpha or defaults.spellTextAlpha)
     icon.text:SetTextColor(textr, textg, textb, textAlpha)
+  end
+
+  if icon.chargeText then
+    ApplyFonts(
+      icon.chargeText,
+      CooldownCursorDB.chargeTextFontPath or defaults.chargeTextFontPath,
+      CooldownCursorDB.chargeTextSize or defaults.chargeTextSize,
+      CooldownCursorDB.chargeTextFontType or defaults.chargeTextFontType
+    )
+
+    local chr, chg, chb = HexToRGB(CooldownCursorDB.chargeTextColor or defaults.chargeTextColor)
+    local chAlpha = PercentToAlpha(CooldownCursorDB.chargeTextAlpha or defaults.chargeTextAlpha)
+    icon.chargeText:SetTextColor(chr, chg, chb, chAlpha)
+
+    local anchorPoint = CHARGE_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.chargeTextAnchor or defaults.chargeTextAnchor)]
+    icon.chargeText:ClearAllPoints()
+    icon.chargeText:SetPoint(anchorPoint.point, icon, anchorPoint.point, anchorPoint.x, anchorPoint.y)
   end
 
   if icon.procOverlay then

@@ -1320,6 +1320,71 @@ local options = {
           get = function() return CooldownCursor:GetDBValue("cooldownTextAnchor") end,
           set = function(_, v) CooldownCursor:SetDBString("cooldownTextAnchor", v) end,
         },
+
+        -- Charge Count section
+        chargeCountHeader = {
+          type = "header",
+          name = "Charge Count",
+          order = 110,
+        },
+
+        chargeTextSize = {
+          type = "range",
+          name = "Font Size",
+          desc = "Size of the charge count text.",
+          order = 120,
+          min = 6,
+          max = 32,
+          step = 1,
+          width = "normal",
+          get = function() return CooldownCursor:GetDBValue("chargeTextSize") end,
+          set = function(_, v) CooldownCursor:SetDBNumber("chargeTextSize", v) end,
+        },
+
+        chargeTextFont = {
+          type = "select",
+          name = "Font",
+          desc = "Font used for the charge count text.",
+          order = 130,
+          width = "normal",
+          values = FontValues,
+          get = function() return CooldownCursor:GetDBValue("chargeTextFont") end,
+          set = function(_, v) CooldownCursor:SetFontPath("chargeTextFont", v) end,
+        },
+
+        chargeTextFontType = {
+          type = "select",
+          name = "Font Type",
+          desc = "Font outline type for the charge count text.",
+          order = 140,
+          width = "normal",
+          values = fontTypeValues,
+          get = function() return CooldownCursor:GetDBValue("chargeTextFontType") end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("chargeTextFontType", v)
+          end,
+        },
+
+        chargeTextColor = {
+          type = "color",
+          name = "Color",
+          hasAlpha = false,
+          order = 150,
+          width = "normal",
+          get = function() return HexColorGet("chargeTextColor", "FFFFFF") end,
+          set = function(_, r, g, b, a) HexColorSet("chargeTextColor", r, g, b, a) end,
+        },
+
+        chargeTextAnchor = {
+          type = "select",
+          name = "Position",
+          desc = "Where to position the charge count on the icon.",
+          order = 160,
+          width = "normal",
+          values = AnchorValues,
+          get = function() return CooldownCursor:GetDBValue("chargeTextAnchor") end,
+          set = function(_, v) CooldownCursor:SetDBString("chargeTextAnchor", v) end,
+        },
       },
     },
 

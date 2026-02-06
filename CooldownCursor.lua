@@ -371,6 +371,16 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
     ["2.2.0"] = {
       breakingChanges = {
         "Spell rules are now saved per class - you may need to re-add spells on alt characters",
+    ["2.1.3"] = {
+      fixes = {
+        "Fixed spell icons not showing when 'Show When' is set to 'Out of Combat' or 'Always'",
+        "Fixed combat state not updating immediately when changing 'Show When' setting",
+        "Fixed addon not detecting combat state correctly on reload",
+      },
+    },
+    ["2.1.2"] = {
+      fixes = {
+        "Minor bug fixes",
       },
       newFeatures = {
         "Proc Spell Support: Show spell icons when procs are active",
@@ -838,9 +848,37 @@ local function GetStackOffset(index, totalIcons)
 end
 
 ----------------------------------------------------
+-- UI Panel tracking
+----------------------------------------------------
+local openPanels = {}
+
+hooksecurefunc("ShowUIPanel", function(frame)
+  if frame then openPanels[frame] = true end
+end)
+
+hooksecurefunc("HideUIPanel", function(frame)
+  if frame then openPanels[frame] = nil end
+end)
+
+local function IsAnyPanelOpen()
+  if next(openPanels) then return true end
+  -- Panels that bypass ShowUIPanel
+  if GameMenuFrame and GameMenuFrame:IsShown() then return true end
+  if SettingsPanel and SettingsPanel:IsShown() then return true end
+  return false
+end
+
+----------------------------------------------------
 -- Cursor tracking and positioning
 ----------------------------------------------------
 local function UpdateCooldownIconFrame(self)
+  if IsAnyPanelOpen() and not previewActive then
+    self.icon:Hide()
+    return
+  else
+    self.icon:SetShown(not CooldownCursorDB.iconHide)
+  end
+
   local uiScale = UIParent:GetEffectiveScale()
   local cursorX, cursorY = GetCursorPosition()
 
@@ -1394,6 +1432,9 @@ end
 -- ON_COOLDOWN:     removes icons whose cooldown has ended.
 -- OFF_COOLDOWN:    seeds icons from rules, then hides/shows based on cooldown state.
 local function ApplyShowBehavior()
+  -- Don't interfere with preview icons
+  if previewActive then return end
+
   -- Don't do anything if addon is disabled
   if CooldownCursorDB.enabled == false then
     return
@@ -1571,6 +1612,15 @@ function CooldownCursor:SetDBNumber(key, value)
   if key == "showBehavior" then
     self:HideAllIcons(true)
     ApplyShowBehavior()
+  end
+  if key == "showWhen" and not previewActive then
+    inCombat = InCombatLockdown()
+    if (value == SHOW_WHEN_STATE.COMBAT and not inCombat)
+        or (value == SHOW_WHEN_STATE.NON_COMBAT and inCombat) then
+      self:HideAllIcons(true)
+    else
+      ApplyShowBehavior()
+    end
   end
   self:UpdateDisplay()
 end
@@ -2035,6 +2085,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     self:UpdateDisplay()
     self:InitAce3Options()
     self:UnregisterEvent("ADDON_LOADED")
+    inCombat = InCombatLockdown()
     return
   end
 
@@ -2099,8 +2150,9 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     inCombat = true
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT then
       CooldownCursor:HideIconNow()
+    else
+      ApplyShowBehavior()
     end
-    ApplyShowBehavior()
     return
   end
 
@@ -2109,15 +2161,25 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     inCombat = false
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT then
       CooldownCursor:HideIconNow()
-    end
-    -- OFF_COOLDOWN mode: icons only make sense in combat, clear everything
-    if (CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER) == SHOW_BEHAVIOR.OFF_COOLDOWN then
-      CooldownCursor:HideAllIcons(true)
+    else
+      ApplyShowBehavior()
     end
     return
   end
 
-  if event == "SPELL_UPDATE_USABLE" and inCombat then
+  if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
+    return
+  end
+
+  if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT and not inCombat then
+    return
+  end
+
+  if CooldownCursorDB.hideWhileMounted and IsMounted() then
+    return
+  end
+
+  if event == "SPELL_UPDATE_USABLE" then
     ApplyShowBehavior()
     return
   end
@@ -2126,18 +2188,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     local spellID
     -- Check if addon is enabled
     if CooldownCursorDB.enabled == false then
-      return
-    end
-
-    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
-      return
-    end
-
-    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT and not inCombat then
-      return
-    end
-
-    if CooldownCursorDB.hideWhileMounted and IsMounted() then
       return
     end
 

@@ -1916,14 +1916,12 @@ CooldownCursor.options = options
 
 function CooldownCursor:OnOptionsOpened()
   -- Options Panel Opened
-  CooldownCursor:HideIconNow()
-  self:RebuildSpellRuleOptions() -- Refresh to show only known spells for current spec
+  self:RebuildSpellRuleOptions()
   CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
 end
 
 function CooldownCursor:OnOptionsClosed()
   -- Options Panel Closed
-  CooldownCursor:HideIconNow()
   CooldownCursor:SetPreviewMouseMode(true)
 end
 

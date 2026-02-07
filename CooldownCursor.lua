@@ -2250,7 +2250,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     unit = ...
     if unit == "player" then
       CooldownCursor:HideAllIcons(true)
-      CooldownCursor:ApplyShowBehavior()
+      ApplyShowBehavior()
       return
     end
   end

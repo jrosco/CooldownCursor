@@ -1124,12 +1124,7 @@ local options = {
 
         cooldownNumbersNote = {
           type = "description",
-          name = function()
-            if CooldownCursor:IsOmniCCLoaded() then
-              return "|cffff8800OmniCC is active - it controls cooldown number appearance.|r"
-            end
-            return "Customize how the cooldown timer appears on the icon."
-          end,
+          name = "Customize how the cooldown timer appears on the icon.",
           order = 55,
         },
 
@@ -1152,8 +1147,7 @@ local options = {
           max = 48,
           step = 1,
           disabled = function()
-            return CooldownCursor:IsOmniCCLoaded() or
-                CooldownCursor:GetDBValue("hideCooldownNumbers")
+            return CooldownCursor:GetDBValue("hideCooldownNumbers")
           end,
           get = function() return CooldownCursor:GetDBValue("cooldownTextSize") end,
           set = function(_, v) CooldownCursor:SetDBNumber("cooldownTextSize", v) end,
@@ -1165,8 +1159,7 @@ local options = {
           order = 80,
           width = "normal",
           disabled = function()
-            return CooldownCursor:IsOmniCCLoaded() or
-                CooldownCursor:GetDBValue("hideCooldownNumbers")
+            return CooldownCursor:GetDBValue("hideCooldownNumbers")
           end,
           values = FontValues,
           -- dialogControl = "LSM30_Font", TODO: https://github.com/SFX-WoW/AceGUI-3.0_SFX-Widgets/wiki/Installation
@@ -1179,7 +1172,7 @@ local options = {
           type = "select",
           name = "Font Type",
           order = 85,
-          disabled = function() return CooldownCursor:IsOmniCCLoaded() end,
+          disabled = false,
           values = fontTypeValues,
           get = function() return (CooldownCursor:GetDBValue("cooldownTextFontType") or "OUTLINE") end,
           set = function(_, v)
@@ -1194,8 +1187,7 @@ local options = {
           order = 90,
           width = "normal",
           disabled = function()
-            return CooldownCursor:IsOmniCCLoaded() or
-                CooldownCursor:GetDBValue("hideCooldownNumbers")
+            return CooldownCursor:GetDBValue("hideCooldownNumbers")
           end,
           get = function() return HexColorGet("cooldownTextColor", "FFFFFF") end,
           set = function(_, r, g, b, a) HexColorSet("cooldownTextColor", r, g, b, a) end,
@@ -1208,8 +1200,7 @@ local options = {
           order = 100,
           width = "normal",
           disabled = function()
-            return CooldownCursor:IsOmniCCLoaded() or
-                CooldownCursor:GetDBValue("hideCooldownNumbers")
+            return CooldownCursor:GetDBValue("hideCooldownNumbers")
           end,
           values = AnchorValues,
           get = function() return CooldownCursor:GetDBValue("cooldownTextAnchor") end,

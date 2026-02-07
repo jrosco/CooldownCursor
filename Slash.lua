@@ -179,11 +179,6 @@ handlers.mount = function()
 end
 
 handlers.number = function(arg1, arg2)
-  local omniCC = CooldownCursor:IsOmniCCLoaded()
-  if omniCC then
-    Print("Warning: OmniCC is detected as loaded. Cooldown text settings will be ignored to avoid conflicts.")
-    return
-  end
   if not arg1 or arg1 == "" then
     Usage("/cdcursor number <alpha||anchor||color||font||ftype||size||toggle>")
     print("options:")
@@ -392,7 +387,6 @@ handlers.status = function()
   Print("   hide while mounted:", CooldownCursor:GetDBValue("hideWhileMounted") and "enabled" or "disabled")
   Print("   size:", CooldownCursor:GetDBValue("iconSize"))
   Print("   scale:", CooldownCursor:GetDBValue("scale"))
-  Print("   OmniCC loaded:", CooldownCursor:IsOmniCCLoaded() and "yes" or "no")
   Print("Current Spelltext settings:")
   Print("   alpha:", CooldownCursor:GetDBValue("spellTextAlpha"))
   Print("   anchor:", CooldownCursor:GetDBValue("spellTextAnchor"))

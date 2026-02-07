@@ -354,6 +354,22 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
             if not rules[class][spellID] then
               rules[class][spellID] = ruleData
             end
+
+            -- Populate static spell metadata
+            local rule = rules[class][spellID]
+            local baseCooldownMS, _ = GetSpellBaseCooldown(spellID)
+            local baseCooldown = baseCooldownMS and (baseCooldownMS / 1000) or 0
+            local chargeInfo = C_Spell.GetSpellCharges(spellID)
+            local info = C_Spell.GetSpellInfo(spellID)
+            rule.baseCooldown = baseCooldown
+            rule.hasCooldown = baseCooldown > 1.5
+            rule.hasCharges = chargeInfo ~= nil
+            rule.maxCharges = chargeInfo and chargeInfo.maxCharges or nil
+            rule.isInstantCast = info and info.castTime == 0 or false
+            rule.castTime = info and (info.castTime / 1000) or 0
+            rule.hasRange = info and info.maxRange > 0 or false
+            rule.maxRange = info and info.maxRange or 0
+
             rules[spellID] = nil -- Remove from old format
             migratedCount = migratedCount + 1
           else
@@ -387,10 +403,12 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- No code execution, just messages
   -- Notes are organized by version (newest first)
 
+  local _cleanedFlatRulesCheckMsg = CooldownCursorDB._cleanedFlatRules and "Your migration is marked cleaned" or "Your migration rules are pending cleanup"
   local releaseNotesByVersion = {
     ["2.2.0"] = {
       breakingChanges = {
         "Spell rules are now saved per class - you may need to re-add spells on alt characters",
+        _cleanedFlatRulesCheckMsg,
       },
       newFeatures = {
         "Proc Spell Support: Show spell icons when procs are active",

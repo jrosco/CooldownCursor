@@ -905,10 +905,9 @@ end
 ----------------------------------------------------
 local function UpdateCooldownIconFrame(self)
   if IsAnyPanelOpen() and not previewActive then
-    self.icon:Hide()
+    self:ClearAllPoints()
+    self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", -100, -100) -- Move off-screen when any panel is open
     return
-  else
-    self.icon:SetShown(not CooldownCursorDB.iconHide)
   end
 
   local uiScale = UIParent:GetEffectiveScale()

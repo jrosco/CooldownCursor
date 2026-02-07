@@ -1421,7 +1421,9 @@ local options = {
               return { [0] = "|cff888888-- Not available in combat --|r" }
             end
             local values = { [0] = "|cff888888-- Select a spell --|r" }
-            local spells = CooldownCursor:GetCooldownSpells(true, 0, true)
+            local includeNoCooldown = CooldownCursor._includeNoCooldownSpells ~= false
+            local includePets = CooldownCursor._includePetSpells or false
+            local spells = CooldownCursor:GetCooldownSpells(includePets, 0, true, includeNoCooldown)
 
             for _, spell in ipairs(spells) do
               if spell.spellID and spell.name then
@@ -1439,7 +1441,9 @@ local options = {
           end,
           sorting = function()
             -- Return spellIDs sorted alphabetically by spell name
-            local spells = CooldownCursor:GetCooldownSpells(true, 0, true)
+            local includeNoCooldown = CooldownCursor._includeNoCooldownSpells ~= false
+            local includePets = CooldownCursor._includePetSpells or false
+            local spells = CooldownCursor:GetCooldownSpells(includePets, 0, true, includeNoCooldown)
             table.sort(spells, function(a, b)
               return (a.name or ""):lower() < (b.name or ""):lower()
             end)
@@ -1466,12 +1470,51 @@ local options = {
           end,
         },
 
+        includePetSpells = {
+          type = "toggle",
+          name = "Pet Spells",
+          desc = "Include pet spells in the dropdown list.",
+          order = 418.5,
+          width = "normal",
+          disabled = function()
+            return InCombatLockdown()
+          end,
+          get = function()
+            return CooldownCursor._includePetSpells or false
+          end,
+          set = function(_, v)
+            CooldownCursor._includePetSpells = v
+            CooldownCursor._selectedSpellbookSpell = 0
+            CooldownCursor:NotifyOptionsChanged()
+          end,
+        },
+
+        includeNoCooldownSpells = {
+          type = "toggle",
+          name = "Non-Cooldown Spells",
+          desc = "Show spells without cooldowns in the dropdown list.\n\n" ..
+              "Useful for adding spells that don't have a base cooldown (e.g. procs, buffs).",
+          order = 418,
+          width = "normal",
+          disabled = function()
+            return InCombatLockdown()
+          end,
+          get = function()
+            return CooldownCursor._includeNoCooldownSpells ~= false
+          end,
+          set = function(_, v)
+            CooldownCursor._includeNoCooldownSpells = v
+            CooldownCursor._selectedSpellbookSpell = 0
+            CooldownCursor:NotifyOptionsChanged()
+          end,
+        },
+
         addFromSpellbook = {
           type = "execute",
           name = "Add",
           desc = "Add the selected spell to your rules.\n\n" ..
               "|cffaaaaaaTip: Select a spell from the dropdown first.|r",
-          order = 418,
+          order = 417.5,
           width = "half",
           func = function()
             local spellID = CooldownCursor._selectedSpellbookSpell

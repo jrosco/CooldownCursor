@@ -87,8 +87,8 @@ function CooldownCursor:RebuildSpellRuleOptions()
 
   -- Sort by priority (higher first), then alphabetically for priority 0
   table.sort(sorted, function(a, b)
-    local aPriority = a.rule.priority or 0
-    local bPriority = b.rule.priority or 0
+    local aPriority = (a.rule.settings and a.rule.settings.priority) or 0
+    local bPriority = (b.rule.settings and b.rule.settings.priority) or 0
 
     -- Spells with priority > 0 come before priority 0
     if aPriority > 0 and bPriority == 0 then
@@ -113,10 +113,11 @@ function CooldownCursor:RebuildSpellRuleOptions()
   for _, entry in ipairs(sorted) do
     local spellID = entry.spellID
     local rule = entry.rule
+    local settings = rule.settings or {}
     local name = entry.name
-    local enabled = rule.enabled
+    local enabled = settings.enabled
     local icon = entry.icon
-    local priority = rule.priority or 0
+    local priority = settings.priority or 0
     local color, suffix = GetRuleDisplayColor(enabled)
     local priorityText = priority > 0 and ("|cffaaaaaa[%d]|r "):format(priority) or ""
     name = ("%s|cff%s%s %s|r"):format(priorityText, color, name, suffix)
@@ -135,9 +136,9 @@ function CooldownCursor:RebuildSpellRuleOptions()
           name = "Enabled",
           desc = "When enabled, this spell will show cooldowns at your cursor.",
           order = 10,
-          get = function() return rule.enabled ~= false end,
+          get = function() return settings.enabled ~= false end,
           set = function(_, v)
-            rule.enabled = v
+            settings.enabled = v
             self:UpdateDisplay()
             self:RebuildSpellRuleOptions()
             self:NotifyOptionsChanged()
@@ -155,13 +156,13 @@ function CooldownCursor:RebuildSpellRuleOptions()
           disabled = function()
             return CooldownCursor:GetDBValue("stackDirection") == "SINGLE" or
                 CooldownCursorDB.spellRules.settings.disableRules or
-                not rule.enabled
+                not settings.enabled
           end,
           get = function()
-            return rule.priority or 0
+            return settings.priority or 0
           end,
           set = function(_, v)
-            rule.priority = v
+            settings.priority = v
             self:UpdateDisplay()
             -- Debounce the rebuild so slider moves smoothly
             if priorityRebuildTimer then
@@ -195,14 +196,14 @@ function CooldownCursor:RebuildSpellRuleOptions()
           max = 128,
           step = 1,
           disabled = function()
-            return rule.useGlobalIconSize ~= false or not rule.enabled
+            return settings.useGlobalIconSize ~= false or not settings.enabled
           end,
           get = function()
-            return rule.iconSize or CooldownCursor:GetDBValue("iconSize")
+            return settings.iconSize or CooldownCursor:GetDBValue("iconSize")
           end,
           set = function(_, v)
-            rule.iconSize = v
-            rule.useGlobalIconSize = false -- auto-disable inheritance
+            settings.iconSize = v
+            settings.useGlobalIconSize = false -- auto-disable inheritance
             self:UpdateDisplay()
           end,
         },
@@ -213,12 +214,12 @@ function CooldownCursor:RebuildSpellRuleOptions()
           desc = "Use the global icon size instead of a per-spell value.",
           order = 23,
           get = function()
-            return rule.useGlobalIconSize ~= false
+            return settings.useGlobalIconSize ~= false
           end,
           set = function(_, v)
-            rule.useGlobalIconSize = v
+            settings.useGlobalIconSize = v
             if v then
-              rule.iconSize = nil
+              settings.iconSize = nil
             end
             self:UpdateDisplay()
           end,

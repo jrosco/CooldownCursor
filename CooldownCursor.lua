@@ -388,7 +388,14 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
             end
             -- Only migrate if not already in class rules
             if not rules[class][spellID] then
-              rules[class][spellID] = ruleData
+              -- Separate old flat data into settings/metadata
+              local settings = {
+                enabled = ruleData.enabled,
+                priority = ruleData.priority,
+                iconSize = ruleData.iconSize,
+                useGlobalIconSize = ruleData.useGlobalIconSize,
+              }
+              rules[class][spellID] = { settings = settings, metadata = {} }
             end
 
             -- Populate static spell metadata
@@ -397,14 +404,15 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
             local baseCooldown = baseCooldownMS and (baseCooldownMS / 1000) or 0
             local chargeInfo = C_Spell.GetSpellCharges(spellID)
             local info = C_Spell.GetSpellInfo(spellID)
-            rule.baseCooldown = baseCooldown
-            rule.hasCooldown = baseCooldown > 1.5
-            rule.hasCharges = chargeInfo ~= nil
-            rule.maxCharges = chargeInfo and chargeInfo.maxCharges or nil
-            rule.isInstantCast = info and info.castTime == 0 or false
-            rule.castTime = info and (info.castTime / 1000) or 0
-            rule.hasRange = info and info.maxRange > 0 or false
-            rule.maxRange = info and info.maxRange or 0
+            rule.metadata = rule.metadata or {}
+            rule.metadata.baseCooldown = baseCooldown
+            rule.metadata.hasCooldown = baseCooldown > 1.5
+            rule.metadata.hasCharges = chargeInfo ~= nil
+            rule.metadata.maxCharges = chargeInfo and chargeInfo.maxCharges or nil
+            rule.metadata.isInstantCast = info and info.castTime == 0 or false
+            rule.metadata.castTime = info and (info.castTime / 1000) or 0
+            rule.metadata.hasRange = info and info.maxRange > 0 or false
+            rule.metadata.maxRange = info and info.maxRange or 0
 
             rules[spellID] = nil -- Remove from old format
             migratedCount = migratedCount + 1
@@ -1384,7 +1392,8 @@ function CooldownCursor:GetSpellRule(spellID)
   if not C_SpellBook.IsSpellKnown(spellID) then return false end
 
   -- Return whether the spell is enabled
-  return rule.enabled ~= false, rule
+  local settings = rule.settings or {}
+  return settings.enabled ~= false, rule
 end
 
 -- Expose GetPlayerClass for Options.lua
@@ -1420,11 +1429,13 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
   if not iconFrame then return nil, nil end
 
   local _, rule = CooldownCursor:GetSpellRule(spellID)
-  local priority = (rule and rule.priority) or 0
+  local settings = rule and rule.settings or {}
+  local metadata = rule and rule.metadata or {}
+  local priority = settings.priority or 0
   local procActive = activeProcSpells[spellID] or false
 
   -- If this spell is an instant cast or has no cooldown, and it's not from a proc, don't create icon.
-  if not fromProc and rule and not rule.hasCooldown and not rule.hasCharges then
+  if not fromProc and rule and not metadata.hasCooldown and not metadata.hasCharges then
     return
   end
 
@@ -1608,7 +1619,7 @@ local function ApplyShowBehavior()
         -- If spell has no cooldown and user doesn't want to show procs, skip it
         if not CooldownCursorDB.global.showProcs and GetSpellBaseCooldown(spellID) == 0 then
           -- continue to next spell (can't use continue in Lua, so we use a nested if)
-        elseif rule.enabled ~= false and not activeIcons[spellID] and C_SpellBook.IsSpellKnown(spellID) then
+        elseif (rule.settings and rule.settings.enabled ~= false) and not activeIcons[spellID] and C_SpellBook.IsSpellKnown(spellID) then
           local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
           if durationObject then
             ShowSpellIcon(spellID, durationObject)
@@ -1815,11 +1826,14 @@ function CooldownCursor:AddOrUpdateSpellRule(spellID, ruleData)
   local classRules = GetClassRules()
   if not classRules then return false, "Could not determine player class" end
 
-  classRules[spellID] = classRules[spellID] or {}
+  classRules[spellID] = classRules[spellID] or { settings = {}, metadata = {} }
+  local rule = classRules[spellID]
+  rule.settings = rule.settings or {}
+  rule.metadata = rule.metadata or {}
 
-  -- Apply user-provided rule data
+  -- Apply user-provided settings
   for k, v in pairs(ruleData or {}) do
-    classRules[spellID][k] = v
+    rule.settings[k] = v
   end
 
   -- Auto-populate static spell metadata
@@ -1828,15 +1842,14 @@ function CooldownCursor:AddOrUpdateSpellRule(spellID, ruleData)
   local chargeInfo = C_Spell.GetSpellCharges(spellID)
   local info = C_Spell.GetSpellInfo(spellID)
 
-  local rule = classRules[spellID]
-  rule.baseCooldown = baseCooldown
-  rule.hasCooldown = baseCooldown > 1.5
-  rule.hasCharges = chargeInfo ~= nil
-  rule.maxCharges = chargeInfo and chargeInfo.maxCharges or nil
-  rule.isInstantCast = info and info.castTime == 0 or false
-  rule.castTime = info and (info.castTime / 1000) or 0
-  rule.hasRange = info and info.maxRange > 0 or false
-  rule.maxRange = info and info.maxRange or 0
+  rule.metadata.baseCooldown = baseCooldown
+  rule.metadata.hasCooldown = baseCooldown > 1.5
+  rule.metadata.hasCharges = chargeInfo ~= nil
+  rule.metadata.maxCharges = chargeInfo and chargeInfo.maxCharges or nil
+  rule.metadata.isInstantCast = info and info.castTime == 0 or false
+  rule.metadata.castTime = info and (info.castTime / 1000) or 0
+  rule.metadata.hasRange = info and info.maxRange > 0 or false
+  rule.metadata.maxRange = info and info.maxRange or 0
 
   return true, spellName
 end
@@ -1858,11 +1871,11 @@ function CooldownCursor:GetEffectiveIconSize(spellID)
   if not classRules then return globalSize end
 
   local rule = classRules[spellID]
-  if not rule then return globalSize end
+  if not rule or not rule.settings then return globalSize end
 
-  if rule.useGlobalIconSize ~= false then return globalSize end
+  if rule.settings.useGlobalIconSize ~= false then return globalSize end
 
-  if rule.iconSize then return rule.iconSize end
+  if rule.settings.iconSize then return rule.settings.iconSize end
 
   return globalSize
 end
@@ -2123,14 +2136,15 @@ function CooldownCursor:PreviewMultiIcon()
     if classRules and next(classRules) then
       -- Use spells from user's class-specific spell rules
       for spellID, rule in pairs(classRules) do
-        if rule.enabled ~= false and C_SpellBook.IsSpellKnown(spellID) then
+        local ruleSettings = rule.settings or {}
+        if ruleSettings.enabled ~= false and C_SpellBook.IsSpellKnown(spellID) then
           local info = C_Spell.GetSpellInfo(spellID)
           if info then
             table.insert(previewSpells, {
               id = spellID,
               duration = 30 + (#previewSpells * 5), -- Vary durations
               name = info.name,
-              priority = rule.priority or 0,
+              priority = ruleSettings.priority or 0,
             })
           end
         end

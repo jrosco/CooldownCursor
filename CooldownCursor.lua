@@ -2193,6 +2193,15 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
+  if event == "PLAYER_SPECIALIZATION_CHANGED" then
+    unit = ...
+    if unit == "player" then
+      CooldownCursor:HideAllIcons(true)
+      CooldownCursor:ApplyShowBehavior()
+      return
+    end
+  end
+
   if event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
     local spellID = ...
     if not spellID then return end
@@ -2360,5 +2369,6 @@ CooldownCursor:RegisterEvent("PLAYER_REGEN_DISABLED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_ENABLED")
 CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
 CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
+CooldownCursor:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 
 

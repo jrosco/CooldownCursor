@@ -1704,9 +1704,26 @@ function CooldownCursor:AddOrUpdateSpellRule(spellID, ruleData)
 
   classRules[spellID] = classRules[spellID] or {}
 
+  -- Apply user-provided rule data
   for k, v in pairs(ruleData or {}) do
     classRules[spellID][k] = v
   end
+
+  -- Auto-populate static spell metadata
+  local baseCooldownMS, _ = GetSpellBaseCooldown(spellID)
+  local baseCooldown = baseCooldownMS and (baseCooldownMS / 1000) or 0
+  local chargeInfo = C_Spell.GetSpellCharges(spellID)
+  local info = C_Spell.GetSpellInfo(spellID)
+
+  local rule = classRules[spellID]
+  rule.baseCooldown = baseCooldown
+  rule.hasCooldown = baseCooldown > 1.5
+  rule.hasCharges = chargeInfo ~= nil
+  rule.maxCharges = chargeInfo and chargeInfo.maxCharges or nil
+  rule.isInstantCast = info and info.castTime == 0 or false
+  rule.castTime = info and (info.castTime / 1000) or 0
+  rule.hasRange = info and info.maxRange > 0 or false
+  rule.maxRange = info and info.maxRange or 0
 
   return true, spellName
 end

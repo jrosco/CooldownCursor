@@ -1366,6 +1366,11 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
   local priority = (rule and rule.priority) or 0
   local procActive = activeProcSpells[spellID] or false
 
+  -- If this spell is an instant cast or has no cooldown, and it's not from a proc, don't create icon.
+  if not fromProc and rule and not rule.hasCooldown and not rule.hasCharges then
+    return
+  end
+
   local iconData = {
     spellID = spellID,
     iconFrame = iconFrame,
@@ -2331,14 +2336,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
         UpdateChargeCount(iconFrame, spellID)
         ApplyShowBehavior()
         return
-      end
-
-      -- If spell has no base cooldown, it's a proc spell
-      -- Only show it if procs are enabled AND the spell is currently proccing
-      if GetSpellBaseCooldown(spellID) == 0 then
-        if not CooldownCursorDB.showProcs or not activeProcSpells[spellID] then
-          return
-        end
       end
 
       if durationObj then

@@ -319,16 +319,16 @@ end
 local function ApplyDisplayModeDefaults(newMode)
   if newMode == "HORIZONTAL" then
     -- Default to RIGHT growth with TOPRIGHT anchor
-    CooldownCursorDB.stackGrowth = "RIGHT"
-    CooldownCursorDB.anchor = "TOPRIGHT"
+    CooldownCursorDB.global.stackGrowth = "RIGHT"
+    CooldownCursorDB.global.anchor = "TOPRIGHT"
   elseif newMode == "VERTICAL" then
     -- Default to DOWN growth with BOTTOM anchor
-    CooldownCursorDB.stackGrowth = "DOWN"
-    CooldownCursorDB.anchor = "BOTTOM"
+    CooldownCursorDB.global.stackGrowth = "DOWN"
+    CooldownCursorDB.global.anchor = "BOTTOM"
   elseif newMode == "RADIUS" then
     -- Default to CLOCKWISE growth with CENTER anchor
-    CooldownCursorDB.stackGrowth = "CLOCKWISE"
-    CooldownCursorDB.anchor = "CENTER"
+    CooldownCursorDB.global.stackGrowth = "CLOCKWISE"
+    CooldownCursorDB.global.anchor = "CENTER"
   end
   -- SINGLE mode: no automatic changes
 end

@@ -188,12 +188,12 @@ function CooldownCursor:GetProcOutlineAtlasSettings()
 end
 
 local function IsProcOverlayEnabled()
-  local atlas = CooldownCursorDB.procOverlayAtlas or defaults.procOverlayAtlas
+  local atlas = CooldownCursorDB.global.procOverlayAtlas or defaults.procOverlayAtlas
   return atlas and atlas ~= "" and atlas ~= "none"
 end
 
 local function IsProcOutlineEnabled()
-  local atlas = CooldownCursorDB.procOutlineAtlas or defaults.procOutlineAtlas
+  local atlas = CooldownCursorDB.global.procOutlineAtlas or defaults.procOutlineAtlas
   return atlas and atlas ~= "" and atlas ~= "none"
 end
 
@@ -275,9 +275,16 @@ local defaults = {
 
 function CooldownCursor:ApplyDefaults()
   CooldownCursorDB = CooldownCursorDB or {}
+  CooldownCursorDB.global = CooldownCursorDB.global or {}
   for k, v in pairs(defaults) do
-    if CooldownCursorDB[k] == nil then
-      CooldownCursorDB[k] = v
+    if k == "spellRules" then
+      if CooldownCursorDB.spellRules == nil then
+        CooldownCursorDB.spellRules = v
+      end
+    else
+      if CooldownCursorDB.global[k] == nil then
+        CooldownCursorDB.global[k] = v
+      end
     end
   end
   CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
@@ -305,6 +312,18 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
     end
   end
 
+  -- Migrate top-level settings into .global subtable
+  if not CooldownCursorDB._migrated.movedToGlobal then
+    CooldownCursorDB.global = CooldownCursorDB.global or {}
+    for k, v in pairs(CooldownCursorDB) do
+      if k ~= "global" and k ~= "spellRules" and k ~= "_migrated" then
+        CooldownCursorDB.global[k] = v
+        CooldownCursorDB[k] = nil
+      end
+    end
+    CooldownCursorDB._migrated.movedToGlobal = true
+  end
+
   -- Initialize version if missing
   if not CooldownCursorDB._migrated.version then
     CooldownCursorDB._migrated.version = 0
@@ -325,12 +344,12 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- migration from version 1 to 2 -------------------------------------------------
   if CooldownCursorDB._migrated.version < 2 then
     -- Run breaking changes here
-    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.ALWAYS then
-      CooldownCursorDB.showWhen = SHOW_WHEN_STATE.COMBAT
+    if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.ALWAYS then
+      CooldownCursorDB.global.showWhen = SHOW_WHEN_STATE.COMBAT
     end
 
-    if CooldownCursorDB.anchor ~= ANCHOR_POSITION.TOPRIGHT then
-      CooldownCursorDB.anchor = ANCHOR_POSITION.TOPRIGHT
+    if CooldownCursorDB.global.anchor ~= ANCHOR_POSITION.TOPRIGHT then
+      CooldownCursorDB.global.anchor = ANCHOR_POSITION.TOPRIGHT
     end
   end
   ----------------------------------------------------------------------------------
@@ -402,7 +421,8 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
       end
 
       if migratedCount > 0 then
-        print("|cff00ff00CooldownCursor:|r Migrated " .. migratedCount .. " spell rules to " .. (class or "unknown") .. " format.")
+        print("|cff00ff00CooldownCursor:|r Migrated " ..
+        migratedCount .. " spell rules to " .. (class or "unknown") .. " format.")
       end
     else
       -- No rules exist, mark as done
@@ -420,10 +440,12 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- No code execution, just messages
   -- Notes are organized by version (newest first)
 
-  local _cleanedFlatRulesCheckMsg = CooldownCursorDB._migrated.cleanedFlatRules and "Your migration is marked cleaned" or "Your migration rules are pending cleanup"
+  local _cleanedFlatRulesCheckMsg = CooldownCursorDB._migrated.cleanedFlatRules and "Your migration is marked cleaned" or
+  "Your migration rules are pending cleanup"
   local releaseNotesByVersion = {
     ["2.2.0"] = {
       breakingChanges = {
+        "Settings have been moved to a 'global' subtable in SavedVariables - existing settings are automatically migrated",
         "Spell rules are now saved per class - you may need to re-add spells on alt characters",
         _cleanedFlatRulesCheckMsg,
       },
@@ -603,7 +625,7 @@ local function CreateIconFrame(index)
 
   -- Proc overlay (SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
   iconFrame.procOverlay = iconFrame:CreateTexture(nil, "OVERLAY")
-  local overlayAtlas = CooldownCursorDB.procOverlayAtlas or defaults.procOverlayAtlas
+  local overlayAtlas = CooldownCursorDB.global.procOverlayAtlas or defaults.procOverlayAtlas
   if IsProcOverlayEnabled() and overlayAtlas and overlayAtlas ~= "" then
     iconFrame.procOverlay:SetAtlas(overlayAtlas, true)
   end
@@ -613,7 +635,7 @@ local function CreateIconFrame(index)
 
   -- Proc outline border
   iconFrame.procOutline = iconFrame:CreateTexture(nil, "OVERLAY")
-  local outlineAtlas = CooldownCursorDB.procOutlineAtlas or defaults.procOutlineAtlas
+  local outlineAtlas = CooldownCursorDB.global.procOutlineAtlas or defaults.procOutlineAtlas
   if IsProcOutlineEnabled() and outlineAtlas and outlineAtlas ~= "" then
     iconFrame.procOutline:SetAtlas(outlineAtlas, true)
   end
@@ -640,7 +662,7 @@ end
 -- Icon Pool Management
 ----------------------------------------------------
 local function InitializeIconPool()
-  local poolSize = CooldownCursorDB.iconPoolSize or defaults.iconPoolSize
+  local poolSize = CooldownCursorDB.global.iconPoolSize or defaults.iconPoolSize
   for i = 1, poolSize do
     local iconFrame = CreateIconFrame(i)
     table.insert(iconPool, iconFrame)
@@ -863,15 +885,15 @@ end
 -- Multi-Icon Stack Offset Calculation
 ----------------------------------------------------
 local function GetStackOffset(index, totalIcons)
-  local iconSize = CooldownCursorDB.iconSize or defaults.iconSize
-  local spacing = CooldownCursorDB.stackSpacing or defaults.stackSpacing
-  local direction = CooldownCursorDB.stackDirection or STACK_DIRECTION.VERTICAL
-  local growth = CooldownCursorDB.stackGrowth or STACK_GROWTH.DOWN
+  local iconSize = CooldownCursorDB.global.iconSize or defaults.iconSize
+  local spacing = CooldownCursorDB.global.stackSpacing or defaults.stackSpacing
+  local direction = CooldownCursorDB.global.stackDirection or STACK_DIRECTION.VERTICAL
+  local growth = CooldownCursorDB.global.stackGrowth or STACK_GROWTH.DOWN
 
   -- For Radius layout
   if direction == STACK_DIRECTION.RADIUS then
-    local radius = CooldownCursorDB.radiusDistance or defaults.radiusDistance
-    local startAngle = CooldownCursorDB.radiusStartAngle or defaults.radiusStartAngle
+    local radius = CooldownCursorDB.global.radiusDistance or defaults.radiusDistance
+    local startAngle = CooldownCursorDB.global.radiusStartAngle or defaults.radiusStartAngle
 
     -- Calculate angle for this icon
     local angleStep = 360 / math.max(1, totalIcons)
@@ -952,9 +974,9 @@ local function UpdateCooldownIconFrame(self)
   local x = cursorX / uiScale
   local y = cursorY / uiScale
 
-  local size = CooldownCursorDB.iconSize or defaults.iconSize
-  local pad = CooldownCursorDB.anchorPadding or defaults.anchorPadding
-  local anchor = CooldownCursorDB.anchor or defaults.anchor
+  local size = CooldownCursorDB.global.iconSize or defaults.iconSize
+  local pad = CooldownCursorDB.global.anchorPadding or defaults.anchorPadding
+  local anchor = CooldownCursorDB.global.anchor or defaults.anchor
 
   local screenW = UIParent:GetWidth()
   local screenH = UIParent:GetHeight()
@@ -1021,11 +1043,11 @@ end
 function CooldownCursor:UpdateSingleIcon(icon, spellID)
   if not icon then return end
 
-  icon.icon:SetShown(not CooldownCursorDB.iconHide)
-  icon.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+  icon.icon:SetShown(not CooldownCursorDB.global.iconHide)
+  icon.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha))
 
   icon:SetFrameStrata(
-    FRAME_STRATA[string.upper(CooldownCursorDB.frameStrata)] or
+    FRAME_STRATA[string.upper(CooldownCursorDB.global.frameStrata)] or
     FRAME_STRATA[string.upper(defaults.frameStrata)]
   )
 
@@ -1033,16 +1055,16 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
   if icon.cooldownText and not omniCC then
     ApplyFonts(
       icon.cooldownText,
-      CooldownCursorDB.cooldownTextFontPath or defaults.cooldownTextFontPath,
-      CooldownCursorDB.cooldownTextSize or defaults.cooldownTextSize,
-      CooldownCursorDB.cooldownTextFontType or defaults.cooldownTextFontType
+      CooldownCursorDB.global.cooldownTextFontPath or defaults.cooldownTextFontPath,
+      CooldownCursorDB.global.cooldownTextSize or defaults.cooldownTextSize,
+      CooldownCursorDB.global.cooldownTextFontType or defaults.cooldownTextFontType
     )
 
-    local cdr, cdg, cdb = HexToRGB(CooldownCursorDB.cooldownTextColor or defaults.cooldownTextColor)
-    local cdAlpha = PercentToAlpha(CooldownCursorDB.cooldownTextAlpha or defaults.cooldownTextAlpha)
+    local cdr, cdg, cdb = HexToRGB(CooldownCursorDB.global.cooldownTextColor or defaults.cooldownTextColor)
+    local cdAlpha = PercentToAlpha(CooldownCursorDB.global.cooldownTextAlpha or defaults.cooldownTextAlpha)
     icon.cooldownText:SetTextColor(cdr, cdg, cdb, cdAlpha)
 
-    local anchorPoint = CD_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.cooldownTextAnchor)]
+    local anchorPoint = CD_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.global.cooldownTextAnchor)]
         or CD_TEXT_ANCHOR_POINTS[string.upper(defaults.cooldownTextAnchor)]
     icon.cooldownText:ClearAllPoints()
     icon.cooldownText:SetPoint(anchorPoint.point, icon, anchorPoint.point, anchorPoint.x, anchorPoint.y)
@@ -1051,68 +1073,69 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
   if icon.text then
     ApplyFonts(
       icon.text,
-      CooldownCursorDB.spellTextFontPath or defaults.spellTextFontPath,
-      CooldownCursorDB.spellTextSize or defaults.spellTextSize,
-      CooldownCursorDB.spellTextFontType or defaults.spellTextFontType
+      CooldownCursorDB.global.spellTextFontPath or defaults.spellTextFontPath,
+      CooldownCursorDB.global.spellTextSize or defaults.spellTextSize,
+      CooldownCursorDB.global.spellTextFontType or defaults.spellTextFontType
     )
 
-    local textr, textg, textb = HexToRGB(CooldownCursorDB.spellTextColor or defaults.spellTextColor)
-    local textAlpha = PercentToAlpha(CooldownCursorDB.spellTextAlpha or defaults.spellTextAlpha)
+    local textr, textg, textb = HexToRGB(CooldownCursorDB.global.spellTextColor or defaults.spellTextColor)
+    local textAlpha = PercentToAlpha(CooldownCursorDB.global.spellTextAlpha or defaults.spellTextAlpha)
     icon.text:SetTextColor(textr, textg, textb, textAlpha)
   end
 
   if icon.chargeText then
     ApplyFonts(
       icon.chargeText,
-      CooldownCursorDB.chargeTextFontPath or defaults.chargeTextFontPath,
-      CooldownCursorDB.chargeTextSize or defaults.chargeTextSize,
-      CooldownCursorDB.chargeTextFontType or defaults.chargeTextFontType
+      CooldownCursorDB.global.chargeTextFontPath or defaults.chargeTextFontPath,
+      CooldownCursorDB.global.chargeTextSize or defaults.chargeTextSize,
+      CooldownCursorDB.global.chargeTextFontType or defaults.chargeTextFontType
     )
 
-    local chr, chg, chb = HexToRGB(CooldownCursorDB.chargeTextColor or defaults.chargeTextColor)
-    local chAlpha = PercentToAlpha(CooldownCursorDB.chargeTextAlpha or defaults.chargeTextAlpha)
+    local chr, chg, chb = HexToRGB(CooldownCursorDB.global.chargeTextColor or defaults.chargeTextColor)
+    local chAlpha = PercentToAlpha(CooldownCursorDB.global.chargeTextAlpha or defaults.chargeTextAlpha)
     icon.chargeText:SetTextColor(chr, chg, chb, chAlpha)
 
-    local anchorPoint = CHARGE_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.chargeTextAnchor or defaults.chargeTextAnchor)]
+    local anchorPoint = CHARGE_TEXT_ANCHOR_POINTS
+    [string.upper(CooldownCursorDB.global.chargeTextAnchor or defaults.chargeTextAnchor)]
     icon.chargeText:ClearAllPoints()
     icon.chargeText:SetPoint(anchorPoint.point, icon, anchorPoint.point, anchorPoint.x, anchorPoint.y)
   end
 
   if icon.procOverlay then
-    local showProcs = CooldownCursorDB.showProcs ~= false
+    local showProcs = CooldownCursorDB.global.showProcs ~= false
     local showOverlay = IsProcOverlayEnabled()
-    local overlayAtlas = CooldownCursorDB.procOverlayAtlas or defaults.procOverlayAtlas
+    local overlayAtlas = CooldownCursorDB.global.procOverlayAtlas or defaults.procOverlayAtlas
     if overlayAtlas and overlayAtlas ~= "" then
       icon.procOverlay:SetAtlas(overlayAtlas, true)
     end
-    local orr, org, orb = HexToRGB(CooldownCursorDB.procOverlayColor or defaults.procOverlayColor)
+    local orr, org, orb = HexToRGB(CooldownCursorDB.global.procOverlayColor or defaults.procOverlayColor)
     icon.procOverlay:SetVertexColor(orr, org, orb, 1)
     icon.procOverlay:SetShown(showProcs and showOverlay and (icon.procActive == true))
   end
   if icon.procOutline then
-    local showProcs = CooldownCursorDB.showProcs ~= false
+    local showProcs = CooldownCursorDB.global.showProcs ~= false
     local showOutline = IsProcOutlineEnabled()
-    local outlineAtlas = CooldownCursorDB.procOutlineAtlas or defaults.procOutlineAtlas
+    local outlineAtlas = CooldownCursorDB.global.procOutlineAtlas or defaults.procOutlineAtlas
     if outlineAtlas and outlineAtlas ~= "" then
       icon.procOutline:SetAtlas(outlineAtlas, true)
     end
-    local otr, otg, otb = HexToRGB(CooldownCursorDB.procOutlineColor or defaults.procOutlineColor)
+    local otr, otg, otb = HexToRGB(CooldownCursorDB.global.procOutlineColor or defaults.procOutlineColor)
     icon.procOutline:SetVertexColor(otr, otg, otb, 1)
     icon.procOutline:SetShown(showProcs and showOutline and (icon.procActive == true))
   end
 
-  local anchorPoint = SPELL_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.spellTextAnchor)]
+  local anchorPoint = SPELL_TEXT_ANCHOR_POINTS[string.upper(CooldownCursorDB.global.spellTextAnchor)]
       or SPELL_TEXT_ANCHOR_POINTS[string.upper(defaults.spellTextAnchor)]
   icon.text:ClearAllPoints()
   icon.text:SetPoint(anchorPoint.point, icon, anchorPoint.relativeTo, anchorPoint.x, anchorPoint.y)
 
   local size = CooldownCursor:GetEffectiveIconSize(spellID)
-  local scale = CooldownCursorDB.scale or defaults.scale
+  local scale = CooldownCursorDB.global.scale or defaults.scale
   icon:SetSize(size * scale, size * scale)
   icon.text:SetScale(scale)
   icon.cooldown:SetScale(scale)
   if icon.procOverlay then
-    local overlayAtlas = CooldownCursorDB.procOverlayAtlas or defaults.procOverlayAtlas
+    local overlayAtlas = CooldownCursorDB.global.procOverlayAtlas or defaults.procOverlayAtlas
     local overlayScale = 1.6
     if overlayAtlas and PROC_OVERLAY_ATLAS_SETTINGS[overlayAtlas] then
       overlayScale = PROC_OVERLAY_ATLAS_SETTINGS[overlayAtlas].scale or overlayScale
@@ -1120,7 +1143,7 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
     icon.procOverlay:SetSize(size * scale * overlayScale, size * scale * overlayScale)
   end
   if icon.procOutline then
-    local outlineAtlas = CooldownCursorDB.procOutlineAtlas or defaults.procOutlineAtlas
+    local outlineAtlas = CooldownCursorDB.global.procOutlineAtlas or defaults.procOutlineAtlas
     local outlineScale = 1.9
     if outlineAtlas and PROC_OUTLINE_ATLAS_SETTINGS[outlineAtlas] then
       outlineScale = PROC_OUTLINE_ATLAS_SETTINGS[outlineAtlas].scale or outlineScale
@@ -1128,12 +1151,12 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
     icon.procOutline:SetSize(size * scale * outlineScale, size * scale * outlineScale)
   end
 
-  icon.cooldown:SetHideCountdownNumbers(CooldownCursorDB.hideCooldownNumbers)
-  icon.cooldown:SetDrawSwipe(CooldownCursorDB.showCooldownSwipe)
+  icon.cooldown:SetHideCountdownNumbers(CooldownCursorDB.global.hideCooldownNumbers)
+  icon.cooldown:SetDrawSwipe(CooldownCursorDB.global.showCooldownSwipe)
 
   if icon:IsShown() and icon.spellID then
     local info = C_Spell.GetSpellInfo(icon.spellID)
-    if info and CooldownCursorDB.showSpellNames and info.name then
+    if info and CooldownCursorDB.global.showSpellNames and info.name then
       icon.text:SetText(info.name)
       icon.text:Show()
     else
@@ -1145,7 +1168,7 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
   -- Apply Masque skin to this icon
   if MasqueGroup then
     MasqueGroup:ReSkin()
-    if CooldownCursorDB.iconHide then
+    if CooldownCursorDB.global.iconHide then
       icon.icon:SetAlpha(0)
     end
   end
@@ -1169,7 +1192,7 @@ local function SortIconsByPriority(a, b)
 end
 
 local function SortIcons()
-  local sortOrder = CooldownCursorDB.sortOrder or SORT_ORDER.PRIORITY
+  local sortOrder = CooldownCursorDB.global.sortOrder or SORT_ORDER.PRIORITY
 
   if sortOrder == SORT_ORDER.ALPHABETICAL then
     table.sort(iconsByPriority, SortIconsAlphabetically)
@@ -1187,8 +1210,8 @@ end
 -- Update Icon Positions
 ----------------------------------------------------
 function UpdateIconPositions()
-  local showBehavior = CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
-  local stackDirection = CooldownCursorDB.stackDirection or defaults.stackDirection
+  local showBehavior = CooldownCursorDB.global.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
+  local stackDirection = CooldownCursorDB.global.stackDirection or defaults.stackDirection
   local isOffCooldown = (showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN)
 
   -- Radius + OFF_COOLDOWN: don't repack. Radius spaces icons evenly around
@@ -1255,12 +1278,12 @@ local function RemoveIconForSpell(spellID, immediate)
     iconFrame.hideTimer = nil
   end
 
-  if immediate or CooldownCursorDB.fadeOutDuration == 0 then
+  if immediate or CooldownCursorDB.global.fadeOutDuration == 0 then
     ReturnIconToPool(iconFrame)
   else
     iconFrame.fadeOut:Stop()
     local fadeOutAnim = iconFrame.fadeOut:GetAnimations()
-    fadeOutAnim:SetDuration(CooldownCursorDB.fadeOutDuration or 0.3)
+    fadeOutAnim:SetDuration(CooldownCursorDB.global.fadeOutDuration or 0.3)
     iconFrame.fadeOut:Play()
   end
 
@@ -1280,7 +1303,7 @@ local function ScheduleHideTimerForIcon(iconFrame, spellID)
   -- Hide timer only applies to AUTO_HIDE_AFTER mode.
   -- ON_COOLDOWN removes icons itself when cooldown ends.
   -- OFF_COOLDOWN keeps icons alive permanently so it can show/hide them.
-  local showBehavior = CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
+  local showBehavior = CooldownCursorDB.global.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
   if showBehavior ~= SHOW_BEHAVIOR.AUTO_HIDE_AFTER then
     return
   end
@@ -1289,7 +1312,7 @@ local function ScheduleHideTimerForIcon(iconFrame, spellID)
     iconFrame.hideTimer:Cancel()
   end
 
-  local hideAfter = CooldownCursorDB.hideAfter or defaults.hideAfter
+  local hideAfter = CooldownCursorDB.global.hideAfter or defaults.hideAfter
 
   iconFrame.hideTimer = C_Timer.NewTimer(hideAfter, function()
     RemoveIconForSpell(spellID, false)
@@ -1300,7 +1323,7 @@ end
 -- Enforce Max Icons
 ----------------------------------------------------
 local function EnforceMaxIcons()
-  local maxIcons = CooldownCursorDB.maxIcons or defaults.maxIcons
+  local maxIcons = CooldownCursorDB.global.maxIcons or defaults.maxIcons
 
   while #iconsByPriority > maxIcons do
     local toRemove = iconsByPriority[#iconsByPriority]
@@ -1375,7 +1398,7 @@ end
 local function UpdateChargeCount(iconFrame, spellID)
   if not iconFrame or not iconFrame.chargeText then return end
 
-  if CooldownCursorDB.showCharges == false then
+  if CooldownCursorDB.global.showCharges == false then
     iconFrame.chargeText:Hide()
     return
   end
@@ -1430,20 +1453,20 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
   iconFrame.icon:SetTexture(spellInfo.iconID)
   iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
 
-  if CooldownCursorDB.showSpellNames and spellInfo.name then
+  if CooldownCursorDB.global.showSpellNames and spellInfo.name then
     iconFrame.text:SetText(spellInfo.name)
     iconFrame.text:Show()
   else
     iconFrame.text:Hide()
   end
 
-  if CooldownCursorDB.animation then
+  if CooldownCursorDB.global.animation then
     iconFrame:SetScale(1)
     iconFrame.showAnim:Stop()
     iconFrame.showAnim:Play()
   end
 
-  iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha))
+  iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha))
   iconFrame:SetScript("OnUpdate", UpdateCooldownIconFrame)
   iconFrame:Show()
 
@@ -1451,12 +1474,12 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
   UpdateChargeCount(iconFrame, spellID)
 
   if iconFrame.procOverlay then
-    local showProcs = CooldownCursorDB.showProcs ~= false
+    local showProcs = CooldownCursorDB.global.showProcs ~= false
     local showOverlay = IsProcOverlayEnabled()
     iconFrame.procOverlay:SetShown(showProcs and showOverlay and procActive)
   end
   if iconFrame.procOutline then
-    local showProcs = CooldownCursorDB.showProcs ~= false
+    local showProcs = CooldownCursorDB.global.showProcs ~= false
     local showOutline = IsProcOutlineEnabled()
     iconFrame.procOutline:SetShown(showProcs and showOutline and procActive)
   end
@@ -1469,14 +1492,14 @@ end
 ----------------------------------------------------
 local function ShowSpellIcon(spellID, durationObject, fromProc)
   -- Don't create icons if addon is disabled
-  if CooldownCursorDB.enabled == false then
+  if CooldownCursorDB.global.enabled == false then
     return nil, nil
   end
 
   local spellInfo = C_Spell.GetSpellInfo(spellID)
   if not spellInfo or not spellInfo.iconID then return nil, nil end
 
-  local stackDirection = CooldownCursorDB.stackDirection or defaults.stackDirection
+  local stackDirection = CooldownCursorDB.global.stackDirection or defaults.stackDirection
   local isSingleMode = (stackDirection == STACK_DIRECTION.SINGLE)
 
   if isSingleMode then
@@ -1505,7 +1528,7 @@ local function ShowSpellIcon(spellID, durationObject, fromProc)
         existingIcon.procOnly = false
         iconFrame.procOnly = false
       end
-      if activeProcSpells[spellID] and CooldownCursorDB.showProcs ~= false then
+      if activeProcSpells[spellID] and CooldownCursorDB.global.showProcs ~= false then
         existingIcon.procActive = true
         iconFrame.procActive = true
         if iconFrame.procOverlay then
@@ -1549,22 +1572,22 @@ local function ApplyShowBehavior()
   if previewActive then return end
 
   -- Don't do anything if addon is disabled
-  if CooldownCursorDB.enabled == false then
+  if CooldownCursorDB.global.enabled == false then
     return
   end
 
-  local showBehavior = CooldownCursorDB.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
+  local showBehavior = CooldownCursorDB.global.showBehavior or SHOW_BEHAVIOR.AUTO_HIDE_AFTER
 
   -- AUTO_HIDE_AFTER - nothing extra to do here
   if showBehavior == SHOW_BEHAVIOR.AUTO_HIDE_AFTER then
     -- If a spell can proc, only show it while the proc is active
-    if CooldownCursorDB.showProcs ~= false then
+    if CooldownCursorDB.global.showProcs ~= false then
       for spellID, iconData in pairs(activeIcons) do
         local iconFrame = iconData.iconFrame
         if iconFrame and procCapableSpells[spellID] then
           local isProcActive = iconData.procActive or iconFrame.procActive
           if isProcActive then
-            iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+            iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha))
           else
             iconFrame:SetAlpha(0)
           end
@@ -1583,7 +1606,7 @@ local function ApplyShowBehavior()
     if classRules then
       for spellID, rule in pairs(classRules) do
         -- If spell has no cooldown and user doesn't want to show procs, skip it
-        if not CooldownCursorDB.showProcs and GetSpellBaseCooldown(spellID) == 0 then
+        if not CooldownCursorDB.global.showProcs and GetSpellBaseCooldown(spellID) == 0 then
           -- continue to next spell (can't use continue in Lua, so we use a nested if)
         elseif rule.enabled ~= false and not activeIcons[spellID] and C_SpellBook.IsSpellKnown(spellID) then
           local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
@@ -1604,14 +1627,14 @@ local function ApplyShowBehavior()
     local iconFrame = iconData.iconFrame
     if iconFrame then
       local isOnCooldown = iconFrame.cooldown:IsShown()
-      local isProcActive = (CooldownCursorDB.showProcs ~= false) and (iconData.procActive or iconFrame.procActive)
+      local isProcActive = (CooldownCursorDB.global.showProcs ~= false) and (iconData.procActive or iconFrame.procActive)
 
       -- Update charge count text
       UpdateChargeCount(iconFrame, spellID)
 
       -- Reset alpha in case it was modified in OFF_COOLDOWN mode
       if isOnCooldown or isProcActive then
-        iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+        iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha))
       end
 
       if showBehavior == SHOW_BEHAVIOR.ON_COOLDOWN then
@@ -1626,21 +1649,21 @@ local function ApplyShowBehavior()
         local procOnlySpell = procCapableSpells[spellID] and GetSpellBaseCooldown(spellID) == 0
         if isProcActive then
           -- Proc is active - always show
-          iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
-        elseif procOnlySpell and (CooldownCursorDB.showProcs ~= false) then
+          iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha))
+        elseif procOnlySpell and (CooldownCursorDB.global.showProcs ~= false) then
           -- Proc-only spell (no cooldown) not currently proccing - hide
           iconFrame:SetAlpha(0)
         elseif isOnCooldown then
           -- On cooldown - but if spell has charges available, still show it
-          local chargeInfo = CooldownCursorDB.showCharges ~= false and C_Spell.GetSpellCharges(spellID)
+          local chargeInfo = CooldownCursorDB.global.showCharges ~= false and C_Spell.GetSpellCharges(spellID)
           if chargeInfo and chargeInfo.currentCharges then
-            iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha))
+            iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha))
           else
             iconFrame:SetAlpha(0)
           end
         else
           -- Off cooldown and ready - show
-          iconFrame:SetAlpha(CooldownCursorDB.iconAlpha or defaults.iconAlpha)
+          iconFrame:SetAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha)
         end
       end
     end
@@ -1672,7 +1695,7 @@ function CooldownCursor:HideIconNow()
     if #iconsByPriority > 0 then
       local iconFrame = iconsByPriority[1].iconFrame
       if iconFrame then
-        RemoveIconForSpell(iconsByPriority[1].spellID, CooldownCursorDB.fadeOutDuration == 0)
+        RemoveIconForSpell(iconsByPriority[1].spellID, CooldownCursorDB.global.fadeOutDuration == 0)
       end
     end
     lastSpellId = nil
@@ -1715,19 +1738,19 @@ function CooldownCursor:GetNotes()
 end
 
 function CooldownCursor:GetDBValue(key)
-  if CooldownCursorDB[key] ~= nil then
-    return CooldownCursorDB[key]
+  if CooldownCursorDB.global[key] ~= nil then
+    return CooldownCursorDB.global[key]
   end
   return defaults[key]
 end
 
 function CooldownCursor:SetDBString(key, value)
-  CooldownCursorDB[key] = string.format("%s", value)
+  CooldownCursorDB.global[key] = string.format("%s", value)
   self:UpdateDisplay()
 end
 
 function CooldownCursor:SetDBNumber(key, value)
-  CooldownCursorDB[key] = tonumber(value)
+  CooldownCursorDB.global[key] = tonumber(value)
   -- Switching showBehavior leaves stale icons (wrong alphas, wrong set of
   -- icons tracked). Clear everything and let ApplyShowBehavior re-seed.
   if key == "showBehavior" then
@@ -1747,7 +1770,7 @@ function CooldownCursor:SetDBNumber(key, value)
 end
 
 function CooldownCursor:SetDBBoolean(key, value)
-  CooldownCursorDB[key] = value and true or false
+  CooldownCursorDB.global[key] = value and true or false
   self:UpdateDisplay()
 end
 
@@ -1845,8 +1868,8 @@ function CooldownCursor:GetEffectiveIconSize(spellID)
 end
 
 function CooldownCursor:SetFontPath(key, value)
-  CooldownCursorDB[key] = value
-  CooldownCursorDB[key .. "Path"] = FontPath(CooldownCursorDB[key])
+  CooldownCursorDB.global[key] = value
+  CooldownCursorDB.global[key .. "Path"] = FontPath(CooldownCursorDB.global[key])
   self:UpdateDisplay()
 end
 
@@ -1898,11 +1921,11 @@ function CooldownCursor:GetValidFrameStrata(strata)
 end
 
 function CooldownCursor:SetHideAfter(seconds)
-  CooldownCursorDB.hideAfter = tonumber(seconds) or defaults.hideAfter
+  CooldownCursorDB.global.hideAfter = tonumber(seconds) or defaults.hideAfter
 end
 
 function CooldownCursor:SetFadeOutDuration(seconds)
-  CooldownCursorDB.fadeOutDuration = tonumber(seconds) or defaults.fadeOutDuration
+  CooldownCursorDB.global.fadeOutDuration = tonumber(seconds) or defaults.fadeOutDuration
 end
 
 function CooldownCursor:GetPreviewMouseMode()
@@ -1917,15 +1940,11 @@ function CooldownCursor:SetPreviewMouseMode(enabled)
 end
 
 function CooldownCursor:ResetSettings()
-  local rules = CooldownCursorDB.spellRules
-  local _migrated = CooldownCursorDB._migrated
   CooldownCursor:HideIconNow()
-  CooldownCursorDB = {}
+  CooldownCursorDB.global = {}
   self:ApplyDefaults()
   self:UpdateDisplay()
   CooldownCursor:SetPreviewMouseMode(true)
-  CooldownCursorDB.spellRules = rules
-  CooldownCursorDB._migrated = _migrated
 end
 
 ----------------------------------------------------
@@ -1945,7 +1964,7 @@ function CooldownCursor:GetActiveIconCount()
 end
 
 function CooldownCursor:IsMultiIconEnabled()
-  local stackDirection = CooldownCursorDB.stackDirection or defaults.stackDirection
+  local stackDirection = CooldownCursorDB.global.stackDirection or defaults.stackDirection
   return stackDirection ~= STACK_DIRECTION.SINGLE
 end
 
@@ -1982,7 +2001,7 @@ function CooldownCursor:GetValidStackDirections()
 end
 
 function CooldownCursor:GetValidStackGrowth()
-  local direction = CooldownCursorDB.stackDirection or STACK_DIRECTION.VERTICAL
+  local direction = CooldownCursorDB.global.stackDirection or STACK_DIRECTION.VERTICAL
 
   if direction == STACK_DIRECTION.SINGLE then
     return {
@@ -2043,7 +2062,7 @@ function CooldownCursor:Preview()
 
   local function ApplyPreviewProc(iconFrame, iconData)
     if not iconFrame or not iconData then return end
-    if CooldownCursorDB.showProcs == false then return end
+    if CooldownCursorDB.global.showProcs == false then return end
     iconData.procActive = true
     iconFrame.procActive = true
     if iconFrame.procOverlay then
@@ -2132,7 +2151,7 @@ function CooldownCursor:PreviewMultiIcon()
 
   local function ApplyPreviewProc(iconFrame, iconData)
     if not iconFrame or not iconData then return end
-    if CooldownCursorDB.showProcs == false then return end
+    if CooldownCursorDB.global.showProcs == false then return end
     iconData.procActive = true
     iconFrame.procActive = true
     if iconFrame.procOverlay then
@@ -2172,7 +2191,7 @@ end
 function CooldownCursor:ApplyPreviewPosition()
   if not previewActive then return end
 
-  local isRadius = (CooldownCursorDB.stackDirection or defaults.stackDirection) == "RADIUS"
+  local isRadius = (CooldownCursorDB.global.stackDirection or defaults.stackDirection) == "RADIUS"
 
   if previewMouseMode then
     for i, iconData in ipairs(iconsByPriority) do
@@ -2239,7 +2258,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
     local spellID = ...
     if not spellID then return end
-    if CooldownCursorDB.showProcs == false then return end
+    if CooldownCursorDB.global.showProcs == false then return end
 
     local show = CooldownCursor:GetSpellRule(spellID)
     if not show then return end
@@ -2272,7 +2291,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
     local spellID = ...
     if not spellID then return end
-    if CooldownCursorDB.showProcs == false then return end
+    if CooldownCursorDB.global.showProcs == false then return end
     activeProcSpells[spellID] = nil
     local iconData = activeIcons[spellID]
     if iconData and iconData.iconFrame then
@@ -2295,7 +2314,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if event == "PLAYER_REGEN_DISABLED" then
     -- Entering combat
     inCombat = true
-    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT then
+    if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.NON_COMBAT then
       CooldownCursor:HideIconNow()
     else
       ApplyShowBehavior()
@@ -2306,7 +2325,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if event == "PLAYER_REGEN_ENABLED" then
     -- Exiting combat
     inCombat = false
-    if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT then
+    if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.COMBAT then
       CooldownCursor:HideIconNow()
     else
       ApplyShowBehavior()
@@ -2314,15 +2333,15 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
-  if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
+  if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
     return
   end
 
-  if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.COMBAT and not inCombat then
+  if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.COMBAT and not inCombat then
     return
   end
 
-  if CooldownCursorDB.hideWhileMounted and IsMounted() then
+  if CooldownCursorDB.global.hideWhileMounted and IsMounted() then
     return
   end
 
@@ -2334,7 +2353,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if SPELL_EVENTS[event] then
     local spellID
     -- Check if addon is enabled
-    if CooldownCursorDB.enabled == false then
+    if CooldownCursorDB.global.enabled == false then
       return
     end
 
@@ -2370,7 +2389,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
 
       -- Check spell usability
       if inRange == false and
-          CooldownCursorDB.showBehavior ~= SHOW_BEHAVIOR.OFF_COOLDOWN then
+          CooldownCursorDB.global.showBehavior ~= SHOW_BEHAVIOR.OFF_COOLDOWN then
         return
       end
 
@@ -2404,5 +2423,3 @@ CooldownCursor:RegisterEvent("PLAYER_REGEN_ENABLED")
 CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
 CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
 CooldownCursor:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-
-

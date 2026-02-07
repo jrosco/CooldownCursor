@@ -288,9 +288,26 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- 1. Apply any breaking changes to CooldownCursorDB (migrations)
   -- 2. Set release notes for display in Options UI
 
+  -- Migrate old flags into _migrated table (must run first)
+  if CooldownCursorDB._migrated == nil then
+    CooldownCursorDB._migrated = {}
+    if CooldownCursorDB._version then
+      CooldownCursorDB._migrated.version = CooldownCursorDB._version
+      CooldownCursorDB._version = nil
+    end
+    if CooldownCursorDB._migratedWhitelist then
+      CooldownCursorDB._migrated.whitelist = CooldownCursorDB._migratedWhitelist
+      CooldownCursorDB._migratedWhitelist = nil
+    end
+    if CooldownCursorDB._cleanedFlatRules then
+      CooldownCursorDB._migrated.cleanedFlatRules = CooldownCursorDB._cleanedFlatRules
+      CooldownCursorDB._cleanedFlatRules = nil
+    end
+  end
+
   -- Initialize version if missing
-  if not CooldownCursorDB._version then
-    CooldownCursorDB._version = 0
+  if not CooldownCursorDB._migrated.version then
+    CooldownCursorDB._migrated.version = 0
   end
 
   -- ========================================
@@ -306,7 +323,7 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
 
   ----------------------------------------------------------------------------------
   -- migration from version 1 to 2 -------------------------------------------------
-  if CooldownCursorDB._version < 2 then
+  if CooldownCursorDB._migrated.version < 2 then
     -- Run breaking changes here
     if CooldownCursorDB.showWhen == SHOW_WHEN_STATE.ALWAYS then
       CooldownCursorDB.showWhen = SHOW_WHEN_STATE.COMBAT
@@ -320,12 +337,12 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
 
   ----------------------------------------------------------------------------------
   -- migration v2.1.0 - Remove whitelist setting -----------------------------------
-  if not CooldownCursorDB._migratedWhitelist then
+  if not CooldownCursorDB._migrated.whitelist then
     -- Remove deprecated whitelist setting from spell rules
     if CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.settings then
       CooldownCursorDB.spellRules.settings.whitelist = nil
     end
-    CooldownCursorDB._migratedWhitelist = true
+    CooldownCursorDB._migrated.whitelist = true
   end
   ----------------------------------------------------------------------------------
 
@@ -334,7 +351,7 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- Old format: rules[spellID] = {...}
   -- New format: rules[CLASS][spellID] = {...}
   -- This runs incrementally per character - only migrates spells the character knows
-  if not CooldownCursorDB._cleanedFlatRules then
+  if not CooldownCursorDB._migrated.cleanedFlatRules then
     local rules = CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules
     if rules then
       local _, class = UnitClass("player")
@@ -381,7 +398,7 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
 
       -- Only mark as done when no old-format rules remain
       if remainingCount == 0 then
-        CooldownCursorDB._cleanedFlatRules = true
+        CooldownCursorDB._migrated.cleanedFlatRules = true
       end
 
       if migratedCount > 0 then
@@ -389,12 +406,12 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
       end
     else
       -- No rules exist, mark as done
-      CooldownCursorDB._cleanedFlatRules = true
+      CooldownCursorDB._migrated.cleanedFlatRules = true
     end
   end
   ----------------------------------------------------------------------------------
 
-  CooldownCursorDB._version = major
+  CooldownCursorDB._migrated.version = major
 
   -- ========================================
   -- RELEASE NOTES (Display Only)
@@ -403,7 +420,7 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   -- No code execution, just messages
   -- Notes are organized by version (newest first)
 
-  local _cleanedFlatRulesCheckMsg = CooldownCursorDB._cleanedFlatRules and "Your migration is marked cleaned" or "Your migration rules are pending cleanup"
+  local _cleanedFlatRulesCheckMsg = CooldownCursorDB._migrated.cleanedFlatRules and "Your migration is marked cleaned" or "Your migration rules are pending cleanup"
   local releaseNotesByVersion = {
     ["2.2.0"] = {
       breakingChanges = {
@@ -1901,14 +1918,14 @@ end
 
 function CooldownCursor:ResetSettings()
   local rules = CooldownCursorDB.spellRules
-  local major = tonumber(self:GetMajorVersion()) or 0
+  local _migrated = CooldownCursorDB._migrated
   CooldownCursor:HideIconNow()
   CooldownCursorDB = {}
   self:ApplyDefaults()
   self:UpdateDisplay()
   CooldownCursor:SetPreviewMouseMode(true)
   CooldownCursorDB.spellRules = rules
-  CooldownCursorDB._version = major
+  CooldownCursorDB._migrated = _migrated
 end
 
 ----------------------------------------------------

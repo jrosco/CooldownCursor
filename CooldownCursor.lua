@@ -53,6 +53,18 @@ local previewMouseMode = true
 local activeProcSpells = {}
 local procCapableSpells = {}
 
+-- Cached known-spell lookup (invalidated on spec change)
+local knownSpellCache = {}
+
+local function IsSpellKnownCached(spellID)
+  local cached = knownSpellCache[spellID]
+  if cached == nil then
+    cached = C_SpellBook.IsSpellKnown(spellID)
+    knownSpellCache[spellID] = cached
+  end
+  return cached
+end
+
 -- Cached screen metrics (refreshed on scale/resolution changes)
 local cachedUIScale = 1
 local cachedScreenW = 0
@@ -1435,7 +1447,7 @@ function CooldownCursor:GetSpellRule(spellID)
   if not rule then return false end
 
   -- If spell is not known to the player (wrong spec, etc.), don't show it
-  if not C_SpellBook.IsSpellKnown(spellID) then return false end
+  if not IsSpellKnownCached(spellID) then return false end
 
   -- Return whether the spell is enabled
   local settings = rule.settings or {}
@@ -1667,7 +1679,7 @@ local function ApplyShowBehavior()
         -- If spell has no cooldown and user doesn't want to show procs, skip it
         if not CooldownCursorDB.global.showProcs and rule.metadata.baseCooldown == 0 then
           -- continue to next spell (can't use continue in Lua, so we use a nested if)
-        elseif (rule.settings and rule.settings.enabled ~= false) and not activeIcons[spellID] and C_SpellBook.IsSpellKnown(spellID) then
+        elseif (rule.settings and rule.settings.enabled ~= false) and not activeIcons[spellID] and IsSpellKnownCached(spellID) then
           local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
           if durationObject then
             ShowSpellIcon(spellID, durationObject)
@@ -2190,7 +2202,7 @@ function CooldownCursor:PreviewMultiIcon()
       -- Use spells from user's class-specific spell rules
       for spellID, rule in pairs(classRules) do
         local ruleSettings = rule.settings or {}
-        if ruleSettings.enabled ~= false and C_SpellBook.IsSpellKnown(spellID) then
+        if ruleSettings.enabled ~= false and IsSpellKnownCached(spellID) then
           local info = C_Spell.GetSpellInfo(spellID)
           if info then
             table.insert(previewSpells, {
@@ -2319,6 +2331,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if event == "PLAYER_SPECIALIZATION_CHANGED" then
     unit = ...
     if unit == "player" then
+      knownSpellCache = {}
       CooldownCursor:HideAllIcons(true)
       ApplyShowBehavior()
       return

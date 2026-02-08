@@ -53,6 +53,29 @@ local previewMouseMode = true
 local activeProcSpells = {}
 local procCapableSpells = {}
 
+-- Cached screen metrics (refreshed on scale/resolution changes)
+local cachedUIScale = 1
+local cachedScreenW = 0
+local cachedScreenH = 0
+
+local function RefreshScreenMetrics()
+  cachedUIScale = UIParent:GetEffectiveScale()
+  cachedScreenW = UIParent:GetWidth()
+  cachedScreenH = UIParent:GetHeight()
+end
+
+-- Cached OnUpdate settings (refreshed in UpdateDisplay / RefreshCachedSettings)
+local cachedIconSize = nil
+local cachedAnchorPadding = nil
+local cachedAnchor = nil
+local cachedIconHide = false
+local cachedAnchorOX = 0
+local cachedAnchorOY = 0
+local cachedHalfSize = 0
+
+-- Reusable buffer for ApplyShowBehavior (avoids table alloc per call)
+local toRemoveBuffer = {}
+
 -- Multi-icon state
 local iconPool = {}
 local activeIcons = {}
@@ -462,6 +485,13 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
         "Proc visual indicators with customizable overlay and border",
         "Class-based Spell Rules: Each class now has its own separate spell rules",
         "Spells not known to your current spec are automatically hidden",
+      }
+    },
+    ["2.1.4"] = {
+      fixes = {
+        "Performance optimizations for smoother cursor icon tracking and reduced memory allocations",
+        "Removed OmniCC support (no longer available in Midnight)",
+
       },
     },
     ["2.1.3"] = {
@@ -696,6 +726,8 @@ function ReturnIconToPool(iconFrame)
   iconFrame.priority = 0
   iconFrame.stackOffsetX = 0
   iconFrame.stackOffsetY = 0
+  iconFrame._lastX = nil
+  iconFrame._lastY = nil
 
   -- Hide primary indicator
   if iconFrame.primaryBorder then
@@ -731,14 +763,6 @@ local Masque = LibStub and LibStub("Masque", true)
 local MasqueGroup = Masque and Masque:Group(addonName)
 
 ----------------------------------------------------
--- OmniCC support check
-----------------------------------------------------
-function CooldownCursor:IsOmniCCLoaded()
-  local _, loaded = C_AddOns.IsAddOnLoaded("OmniCC")
-  return loaded
-end
-
-----------------------------------------------------
 --- LibSharedMedia support
 ----------------------------------------------------
 local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
@@ -746,30 +770,26 @@ local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 ----------------------------------------------------
 -- Internal cursor positioning helper
 ----------------------------------------------------
+-- Pre-built flip lookup tables (replaces string.find/gsub per frame)
+local FLIP_X = {
+  LEFT = "RIGHT", RIGHT = "LEFT",
+  TOPLEFT = "TOPRIGHT", TOPRIGHT = "TOPLEFT",
+  BOTTOMLEFT = "BOTTOMRIGHT", BOTTOMRIGHT = "BOTTOMLEFT",
+  TOP = "TOP", BOTTOM = "BOTTOM", CENTER = "CENTER",
+}
+local FLIP_Y = {
+  TOP = "BOTTOM", BOTTOM = "TOP",
+  TOPLEFT = "BOTTOMLEFT", TOPRIGHT = "BOTTOMRIGHT",
+  BOTTOMLEFT = "TOPLEFT", BOTTOMRIGHT = "TOPRIGHT",
+  LEFT = "LEFT", RIGHT = "RIGHT", CENTER = "CENTER",
+}
+
 local function FlipAnchorX(anchor)
-  if anchor:find("LEFT") then
-    return anchor:gsub("LEFT", "RIGHT")
-  elseif anchor:find("RIGHT") then
-    return anchor:gsub("RIGHT", "LEFT")
-  elseif anchor == "LEFT" then
-    return "RIGHT"
-  elseif anchor == "RIGHT" then
-    return "LEFT"
-  end
-  return anchor
+  return FLIP_X[anchor] or anchor
 end
 
 local function FlipAnchorY(anchor)
-  if anchor:find("TOP") then
-    return anchor:gsub("TOP", "BOTTOM")
-  elseif anchor:find("BOTTOM") then
-    return anchor:gsub("BOTTOM", "TOP")
-  elseif anchor == "TOP" then
-    return "BOTTOM"
-  elseif anchor == "BOTTOM" then
-    return "TOP"
-  end
-  return anchor
+  return FLIP_Y[anchor] or anchor
 end
 
 local function AnchorOffsets(anchor, size, pad)
@@ -796,6 +816,15 @@ local function AnchorOffsets(anchor, size, pad)
   end
 
   return ox, oy
+end
+
+local function RefreshCachedSettings()
+  cachedIconSize = CooldownCursorDB.iconSize or defaults.iconSize
+  cachedAnchorPadding = CooldownCursorDB.anchorPadding or defaults.anchorPadding
+  cachedAnchor = CooldownCursorDB.anchor or defaults.anchor
+  cachedIconHide = CooldownCursorDB.iconHide or false
+  cachedAnchorOX, cachedAnchorOY = AnchorOffsets(cachedAnchor, cachedIconSize, cachedAnchorPadding)
+  cachedHalfSize = cachedIconSize / 2
 end
 
 ----------------------------------------------------
@@ -948,21 +977,41 @@ end
 -- UI Panel tracking
 ----------------------------------------------------
 local openPanels = {}
+local cachedPanelOpen = false
+
+local function RefreshPanelCache()
+  cachedPanelOpen = (next(openPanels) ~= nil)
+    or (GameMenuFrame and GameMenuFrame:IsShown())
+    or (SettingsPanel and SettingsPanel:IsShown())
+    or false
+end
 
 hooksecurefunc("ShowUIPanel", function(frame)
-  if frame then openPanels[frame] = true end
+  if frame then
+    openPanels[frame] = true
+    RefreshPanelCache()
+  end
 end)
 
 hooksecurefunc("HideUIPanel", function(frame)
-  if frame then openPanels[frame] = nil end
+  if frame then
+    openPanels[frame] = nil
+    RefreshPanelCache()
+  end
 end)
 
+-- GameMenuFrame and SettingsPanel bypass ShowUIPanel/HideUIPanel,
+-- so we hook their Show/Hide to keep the cache accurate.
+local function HookPanelVisibility(panel)
+  if not panel then return end
+  panel:HookScript("OnShow", RefreshPanelCache)
+  panel:HookScript("OnHide", RefreshPanelCache)
+end
+HookPanelVisibility(GameMenuFrame)
+HookPanelVisibility(SettingsPanel)
+
 local function IsAnyPanelOpen()
-  if next(openPanels) then return true end
-  -- Panels that bypass ShowUIPanel
-  if GameMenuFrame and GameMenuFrame:IsShown() then return true end
-  if SettingsPanel and SettingsPanel:IsShown() then return true end
-  return false
+  return cachedPanelOpen
 end
 
 ----------------------------------------------------
@@ -971,27 +1020,19 @@ end
 local function UpdateCooldownIconFrame(self)
   if IsAnyPanelOpen() and not previewActive then
     self:ClearAllPoints()
-    self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", -100, -100) -- Move off-screen when any panel is open
+    self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", -100, -100) -- Move off-screen
     return
   end
 
-  local uiScale = UIParent:GetEffectiveScale()
   local cursorX, cursorY = GetCursorPosition()
 
-  -- Convert cursor position to UI coordinates
-  local x = cursorX / uiScale
-  local y = cursorY / uiScale
+  -- Convert cursor position to UI coordinates (using cached metrics)
+  local x = cursorX / cachedUIScale
+  local y = cursorY / cachedUIScale
+  local half = cachedHalfSize
 
-  local size = CooldownCursorDB.global.iconSize or defaults.iconSize
-  local pad = CooldownCursorDB.global.anchorPadding or defaults.anchorPadding
-  local anchor = CooldownCursorDB.global.anchor or defaults.anchor
-
-  local screenW = UIParent:GetWidth()
-  local screenH = UIParent:GetHeight()
-  local half = size / 2
-
-  -- Get base offset from anchor
-  local ox, oy = AnchorOffsets(anchor, size, pad)
+  -- Use pre-computed base offset from anchor
+  local ox, oy = cachedAnchorOX, cachedAnchorOY
 
   -- Add stack offset (this positions icons relative to each other)
   ox = ox + (self.stackOffsetX or 0)
@@ -1002,12 +1043,12 @@ local function UpdateCooldownIconFrame(self)
 
   -- Check if it would go off-screen
   local offLeft = (targetX - half) < 0
-  local offRight = (targetX + half) > screenW
+  local offRight = (targetX + half) > cachedScreenW
   local offBottom = (targetY - half) < 0
-  local offTop = (targetY + half) > screenH
+  local offTop = (targetY + half) > cachedScreenH
 
   -- Flip anchor if needed
-  local flipped = anchor
+  local flipped = cachedAnchor
   if offLeft or offRight then
     flipped = FlipAnchorX(flipped)
   end
@@ -1016,23 +1057,28 @@ local function UpdateCooldownIconFrame(self)
   end
 
   -- Recalculate if flipped
-  if flipped ~= anchor then
-    ox, oy = AnchorOffsets(flipped, size, pad)
+  if flipped ~= cachedAnchor then
+    ox, oy = AnchorOffsets(flipped, cachedIconSize, cachedAnchorPadding)
     ox = ox + (self.stackOffsetX or 0)
     oy = oy + (self.stackOffsetY or 0)
     targetX = x + ox
     targetY = y + oy
   end
 
-  -- Set position directly
-  self:ClearAllPoints()
-  self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", targetX, targetY)
+  -- Only update position if it actually changed (avoids redundant layout invalidation)
+  if self._lastX ~= targetX or self._lastY ~= targetY then
+    self:ClearAllPoints()
+    self:SetPoint("CENTER", UIParent, "BOTTOMLEFT", targetX, targetY)
+    self._lastX = targetX
+    self._lastY = targetY
+  end
 end
 
 ----------------------------------------------------
 -- Apply settings and refresh active display
 ----------------------------------------------------
 function CooldownCursor:UpdateDisplay(spellID)
+  RefreshCachedSettings()
   if self:IsMultiIconEnabled() then
     for _, iconData in ipairs(iconsByPriority) do
       self:UpdateSingleIcon(iconData.iconFrame, iconData.spellID)
@@ -1045,6 +1091,11 @@ function CooldownCursor:UpdateDisplay(spellID)
       firstIcon.stackOffsetY = 0
       self:UpdateSingleIcon(firstIcon, iconsByPriority[1].spellID)
     end
+  end
+
+  -- Apply Masque skin once after all icons are updated
+  if MasqueGroup then
+    MasqueGroup:ReSkin()
   end
 end
 
@@ -1059,8 +1110,7 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
     FRAME_STRATA[string.upper(defaults.frameStrata)]
   )
 
-  local omniCC = self:IsOmniCCLoaded()
-  if icon.cooldownText and not omniCC then
+  if icon.cooldownText then
     ApplyFonts(
       icon.cooldownText,
       CooldownCursorDB.global.cooldownTextFontPath or defaults.cooldownTextFontPath,
@@ -1172,13 +1222,9 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
     end
   end
 
-
-  -- Apply Masque skin to this icon
-  if MasqueGroup then
-    MasqueGroup:ReSkin()
-    if CooldownCursorDB.global.iconHide then
-      icon.icon:SetAlpha(0)
-    end
+  -- Apply Masque iconHide override (ReSkin is called once in UpdateDisplay)
+  if MasqueGroup and CooldownCursorDB.iconHide then
+    icon.icon:SetAlpha(0)
   end
 end
 
@@ -1632,7 +1678,8 @@ local function ApplyShowBehavior()
   -- Collect spellIDs to remove (ON_COOLDOWN mode).
   -- We cannot call RemoveIconForSpell inside the loop because it
   -- modifies activeIcons while we are iterating it.
-  local toRemove = {}
+  -- Reuse a buffer to avoid allocating a new table every call.
+  local toRemoveCount = 0
 
   for spellID, iconData in pairs(activeIcons) do
     local iconFrame = iconData.iconFrame
@@ -1652,7 +1699,8 @@ local function ApplyShowBehavior()
         -- ON_COOLDOWN: icon should only be visible while on cooldown.
         -- Mark for removal once the cooldown ends.
         if not isOnCooldown and not isProcActive then
-          table.insert(toRemove, spellID)
+          toRemoveCount = toRemoveCount + 1
+          toRemoveBuffer[toRemoveCount] = spellID
         end
       elseif showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN then
         -- OFF_COOLDOWN: icon should only be visible when ready.
@@ -1681,8 +1729,9 @@ local function ApplyShowBehavior()
   end
 
   -- Now safe to remove - we are no longer iterating activeIcons
-  for _, spellID in ipairs(toRemove) do
-    RemoveIconForSpell(spellID, false)
+  for i = 1, toRemoveCount do
+    RemoveIconForSpell(toRemoveBuffer[i], false)
+    toRemoveBuffer[i] = nil
   end
 
   -- Repack icon positions after visibility changes.
@@ -2239,19 +2288,22 @@ end
 ----------------------------------------------------
 -- Event handler
 ----------------------------------------------------
+local SPELL_EVENTS = {
+  UNIT_SPELLCAST_FAILED = true,
+  UNIT_SPELLCAST_SENT = true,
+  UNIT_SPELLCAST_SUCCEEDED = true,
+  SPELL_UPDATE_COOLDOWN = true,
+  SPELL_UPDATE_USABLE = true,
+}
+local pendingSpellTimers = {}
+
 CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   local unit
-  local SPELL_EVENTS = {
-    UNIT_SPELLCAST_FAILED = true,
-    UNIT_SPELLCAST_SENT = true,
-    UNIT_SPELLCAST_SUCCEEDED = true,
-    SPELL_UPDATE_COOLDOWN = true,
-    SPELL_UPDATE_USABLE = true,
-  }
   if event == "ADDON_LOADED" then
     local name = ...
     if name ~= addonName then return end
     self:ApplyDefaults()
+    RefreshScreenMetrics()
     self:InitMultiIconSystem()
     self:UpdateDisplay()
     self:InitAce3Options()
@@ -2325,6 +2377,11 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
+  if event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
+    RefreshScreenMetrics()
+    return
+  end
+
   if event == "PLAYER_REGEN_DISABLED" then
     -- Entering combat
     inCombat = true
@@ -2385,41 +2442,44 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     local show, _ = CooldownCursor:GetSpellRule(spellID)
     if not show then return end
 
-    -- Delay slightly to allow cooldown to register
-    C_Timer.After(0.01, function()
-      local durationObj = C_Spell.GetSpellCooldownDuration(spellID)
-      local hasCharges = C_Spell.GetSpellCharges(spellID) ~= nil
+    -- Debounce: skip if a timer is already pending for this spellID
+    if not pendingSpellTimers[spellID] then
+      pendingSpellTimers[spellID] = true
+      -- Delay slightly to allow cooldown to register
+      C_Timer.After(0.01, function()
+        pendingSpellTimers[spellID] = nil
+        local durationObj = C_Spell.GetSpellCooldownDuration(spellID)
+        local hasCharges = C_Spell.GetSpellCharges(spellID) ~= nil
 
-      if not durationObj then return end
+        if not durationObj then return end
 
-      -- Filter out non-cooldown abilities (buffs, mounts, etc.).
-      if durationObj and not durationObj:HasSecretValues()
-          and durationObj:GetStartTime() == 0 then
-        return
-      end
+        -- local usable = C_Spell.IsSpellUsable(spellID)
+        local inRange = C_Spell.IsSpellInRange(spellID)
 
-      -- local usable = C_Spell.IsSpellUsable(spellID)
-      local inRange = C_Spell.IsSpellInRange(spellID)
-
-      -- Check spell usability
-      if inRange == false and
+        -- Check spell usability
+        if inRange == false and
           CooldownCursorDB.global.showBehavior ~= SHOW_BEHAVIOR.OFF_COOLDOWN then
-        return
-      end
+          return
+        end
 
-      if hasCharges then
-        local iconFrame, _ = ShowSpellIcon(spellID, durationObj)
-        UpdateChargeCount(iconFrame, spellID)
+        if hasCharges then
+          local iconFrame, _ = ShowSpellIcon(spellID, durationObj)
+          UpdateChargeCount(iconFrame, spellID)
+          ApplyShowBehavior()
+          return
+        end
+
+        -- Check user spell rules
+        local show, rule = CooldownCursor:GetSpellRule(spellID)
+        if not show then return end
+
+        if durationObj then
+          ShowSpellIcon(spellID, durationObj)
+        end
+
         ApplyShowBehavior()
-        return
-      end
-
-      if durationObj then
-        ShowSpellIcon(spellID, durationObj)
-      end
-
-      ApplyShowBehavior()
-    end)
+      end)
+    end
   end
 end)
 
@@ -2437,3 +2497,5 @@ CooldownCursor:RegisterEvent("PLAYER_REGEN_ENABLED")
 CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
 CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
 CooldownCursor:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+CooldownCursor:RegisterEvent("UI_SCALE_CHANGED")
+CooldownCursor:RegisterEvent("DISPLAY_SIZE_CHANGED")

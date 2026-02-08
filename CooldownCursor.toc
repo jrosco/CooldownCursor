@@ -12,4 +12,3 @@ Spells.lua
 CooldownCursor.lua
 Options.lua
 Slash.lua
-

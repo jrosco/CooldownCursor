@@ -1523,7 +1523,14 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
   CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
 
   iconFrame.icon:SetTexture(spellInfo.iconID)
-  iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
+
+  -- Proc-only spells have no real cooldown - hide the timer overlay
+  if fromProc and not metadata.hasCooldown and not metadata.hasCharges then
+    iconFrame.cooldown:SetHideCountdownNumbers(true)
+    iconFrame.cooldown:SetDrawSwipe(false)
+  else
+    iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
+  end
 
   if CooldownCursorDB.global.showSpellNames and spellInfo.name then
     iconFrame.text:SetText(spellInfo.name)
@@ -2203,14 +2210,17 @@ function CooldownCursor:PreviewMultiIcon()
       -- Use spells from user's class-specific spell rules
       for spellID, rule in pairs(classRules) do
         local ruleSettings = rule.settings or {}
+        local metadata = rule.metadata or {}
         if ruleSettings.enabled ~= false and IsSpellKnownCached(spellID) then
           local info = C_Spell.GetSpellInfo(spellID)
           if info then
+            local isProc = not metadata.hasCooldown and not metadata.hasCharges
             table.insert(previewSpells, {
               id = spellID,
               duration = 30 + (#previewSpells * 5), -- Vary durations
               name = info.name,
               priority = ruleSettings.priority or 0,
+              isProc = isProc,
             })
           end
         end
@@ -2259,8 +2269,10 @@ function CooldownCursor:PreviewMultiIcon()
       local spellData = spellPool[i]
       local durationObj = C_DurationUtil.CreateDuration()
       durationObj:SetTimeFromStart(GetTime(), spellData.duration)
-      local iconFrame, iconData = ShowSpellIcon(spellData.id, durationObj)
-      ApplyPreviewProc(iconFrame, iconData)
+      local iconFrame, iconData = ShowSpellIcon(spellData.id, durationObj, spellData.isProc)
+      if spellData.isProc then
+        ApplyPreviewProc(iconFrame, iconData)
+      end
     end
     self:ApplyPreviewPosition()
   end

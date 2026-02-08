@@ -1494,6 +1494,7 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
     priority = priority,
     procActive = procActive,
     procOnly = fromProc == true,
+    baseCooldown = metadata.baseCooldown or 0,
   }
 
   activeIcons[spellID] = iconData
@@ -1663,7 +1664,7 @@ local function ApplyShowBehavior()
     if classRules then
       for spellID, rule in pairs(classRules) do
         -- If spell has no cooldown and user doesn't want to show procs, skip it
-        if not CooldownCursorDB.global.showProcs and GetSpellBaseCooldown(spellID) == 0 then
+        if not CooldownCursorDB.global.showProcs and rule.metadata.baseCooldown == 0 then
           -- continue to next spell (can't use continue in Lua, so we use a nested if)
         elseif (rule.settings and rule.settings.enabled ~= false) and not activeIcons[spellID] and C_SpellBook.IsSpellKnown(spellID) then
           local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
@@ -1705,7 +1706,7 @@ local function ApplyShowBehavior()
       elseif showBehavior == SHOW_BEHAVIOR.OFF_COOLDOWN then
         -- OFF_COOLDOWN: icon should only be visible when ready.
         -- Use SetAlpha so the cooldown frame stays alive and keeps updating.
-        local procOnlySpell = procCapableSpells[spellID] and GetSpellBaseCooldown(spellID) == 0
+        local procOnlySpell = procCapableSpells[spellID] and iconData.baseCooldown == 0
         if isProcActive then
           -- Proc is active - always show
           iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha))

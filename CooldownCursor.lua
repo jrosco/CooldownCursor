@@ -1495,6 +1495,7 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
     procActive = procActive,
     procOnly = fromProc == true,
     baseCooldown = metadata.baseCooldown or 0,
+    hasCharges = metadata.hasCharges or false,
   }
 
   activeIcons[spellID] = iconData
@@ -1688,8 +1689,10 @@ local function ApplyShowBehavior()
       local isOnCooldown = iconFrame.cooldown:IsShown()
       local isProcActive = (CooldownCursorDB.global.showProcs ~= false) and (iconData.procActive or iconFrame.procActive)
 
-      -- Update charge count text
-      UpdateChargeCount(iconFrame, spellID)
+      -- Update charge count text (only for spells that have charges)
+      if iconData.hasCharges then
+        UpdateChargeCount(iconFrame, spellID)
+      end
 
       -- Reset alpha in case it was modified in OFF_COOLDOWN mode
       if isOnCooldown or isProcActive then
@@ -2440,8 +2443,9 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     if not spellID then return end
 
     -- Check user spell rules before doing any cooldown queries
-    local show, _ = CooldownCursor:GetSpellRule(spellID)
+    local show, rule = CooldownCursor:GetSpellRule(spellID)
     if not show then return end
+    local hasCharges = rule and rule.metadata and rule.metadata.hasCharges or false
 
     -- Debounce: skip if a timer is already pending for this spellID
     if not pendingSpellTimers[spellID] then
@@ -2450,7 +2454,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       C_Timer.After(0.01, function()
         pendingSpellTimers[spellID] = nil
         local durationObj = C_Spell.GetSpellCooldownDuration(spellID)
-        local hasCharges = C_Spell.GetSpellCharges(spellID) ~= nil
 
         if not durationObj then return end
 

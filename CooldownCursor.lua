@@ -489,11 +489,12 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
     ["2.2.0"] = {
       breakingChanges = {
         "Settings have been moved to a 'global' subtable in SavedVariables - existing settings are automatically migrated",
-        "Spell rules are now saved per class - you may need to re-add spells on alt characters",
+        "Spell rules are now saved per class - |cff00ff00you may need to|r |cffFFBB4A/reload|r |cff00ff00UI for alt characters|r",
         _cleanedFlatRulesCheckMsg,
       },
       newFeatures = {
         "Proc Spell Support: Show spell icons when procs are active",
+        "Charge Spell Support: Show spell icons with charges when active",
         "Proc visual indicators with customizable overlay and border",
         "Class-based Spell Rules: Each class now has its own separate spell rules",
         "Spells not known to your current spec are automatically hidden",

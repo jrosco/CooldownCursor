@@ -819,10 +819,10 @@ local function AnchorOffsets(anchor, size, pad)
 end
 
 local function RefreshCachedSettings()
-  cachedIconSize = CooldownCursorDB.iconSize or defaults.iconSize
-  cachedAnchorPadding = CooldownCursorDB.anchorPadding or defaults.anchorPadding
-  cachedAnchor = CooldownCursorDB.anchor or defaults.anchor
-  cachedIconHide = CooldownCursorDB.iconHide or false
+  cachedIconSize = CooldownCursorDB.global.iconSize or defaults.iconSize
+  cachedAnchorPadding = CooldownCursorDB.global.anchorPadding or defaults.anchorPadding
+  cachedAnchor = CooldownCursorDB.global.anchor or defaults.anchor
+  cachedIconHide = CooldownCursorDB.global.iconHide or false
   cachedAnchorOX, cachedAnchorOY = AnchorOffsets(cachedAnchor, cachedIconSize, cachedAnchorPadding)
   cachedHalfSize = cachedIconSize / 2
 end
@@ -1223,7 +1223,7 @@ function CooldownCursor:UpdateSingleIcon(icon, spellID)
   end
 
   -- Apply Masque iconHide override (ReSkin is called once in UpdateDisplay)
-  if MasqueGroup and CooldownCursorDB.iconHide then
+  if MasqueGroup and CooldownCursorDB.global.iconHide then
     icon.icon:SetAlpha(0)
   end
 end

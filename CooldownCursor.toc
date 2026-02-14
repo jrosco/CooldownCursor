@@ -12,6 +12,7 @@ Config\Constants.lua
 Config\Defaults.lua
 Core.lua
 Modules\Spells.lua
+Modules\Icons.lua
 Modules\Cursor.lua
 Modules\Cooldown.lua
 Modules\Settings.lua

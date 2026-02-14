@@ -21,6 +21,65 @@ local SHOW_BEHAVIOR = C.SHOW_BEHAVIOR
 local CooldownCursor = addonTable.Frame
 
 ----------------------------------------------------
+-- Show-when state helper
+----------------------------------------------------
+-- Returns true if the current combat state does NOT match showWhen,
+-- meaning events should be suppressed. Handles combat transitions
+-- by hiding icons when leaving the allowed state.
+local function CheckShowWhenState(combatTransition)
+  local showWhen = CooldownCursorDB.global.showWhen
+  if not showWhen or showWhen == SHOW_WHEN_STATE.ALWAYS then
+    return false
+  end
+
+  if showWhen == SHOW_WHEN_STATE.COMBAT then
+    if not State.inCombat then
+      -- Leaving combat with COMBAT mode: hide icons
+      if combatTransition then
+        CooldownCursor:HideIconNow()
+      end
+      return true
+    end
+  elseif showWhen == SHOW_WHEN_STATE.NON_COMBAT then
+    if State.inCombat then
+      -- Entering combat with NON_COMBAT mode: hide icons
+      if combatTransition then
+        CooldownCursor:HideIconNow()
+      end
+      return true
+    end
+  end
+
+  return false
+end
+
+----------------------------------------------------
+-- Mounted state helper
+----------------------------------------------------
+local wasMounted = false
+
+local function CheckMountedState()
+  if not CooldownCursorDB.global.hideWhileMounted then return false end
+
+  local mounted = IsMounted()
+  if mounted then
+    if not wasMounted then
+      wasMounted = true
+      CooldownCursor:HideAllIcons(true)
+    end
+    return true -- signal: skip further processing
+  end
+
+  if wasMounted then
+    wasMounted = false
+    if not CheckShowWhenState() then
+      ApplyShowBehavior()
+    end
+  end
+  return false
+end
+
+----------------------------------------------------
 -- Event handler
 ----------------------------------------------------
 local SPELL_EVENTS = {
@@ -33,6 +92,7 @@ local SPELL_EVENTS = {
 local pendingSpellTimers = {}
 
 CooldownCursor:SetScript("OnEvent", function(self, event, ...)
+  print("CooldownCursor: Event - " .. event)
   local unit
   if event == "ADDON_LOADED" then
     local name = ...
@@ -57,7 +117,15 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
   end
 
+  -- Detect mount/dismount
+  if event == "PLAYER_MOUNT_DISPLAY_CHANGED" then
+    CheckMountedState()
+    return
+  end
+
   if event == "SPELL_UPDATE_CHARGES" then
+    if CheckShowWhenState() then return end
+    if CheckMountedState() then return end
     if CooldownCursorDB.global.showCharges ~= false then
       for spellID, iconData in pairs(State.activeIcons) do
         if iconData and iconData.iconFrame and iconData.hasCharges then
@@ -70,6 +138,8 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   end
 
   if event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
+    if CheckShowWhenState() then return end
+    if CheckMountedState() then return end
     local spellID = ...
     if not spellID then return end
     if CooldownCursorDB.global.showProcs == false then return end
@@ -131,39 +201,24 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   end
 
   if event == "PLAYER_REGEN_DISABLED" then
-    -- Entering combat
     State.inCombat = true
-    if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.NON_COMBAT then
-      CooldownCursor:HideIconNow()
-    else
+    if not CheckShowWhenState(true) then
       ApplyShowBehavior()
     end
     return
   end
 
   if event == "PLAYER_REGEN_ENABLED" then
-    -- Exiting combat
     State.inCombat = false
-    if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.COMBAT then
-      CooldownCursor:HideIconNow()
-    else
+    if not CheckShowWhenState(true) then
       ApplyShowBehavior()
     end
     return
   end
 
-  if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.NON_COMBAT and State.inCombat then
-    return
-  end
+  if CheckShowWhenState() then return end
 
-  if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.COMBAT and not State.inCombat then
-    return
-  end
-
-  if CooldownCursorDB.global.hideWhileMounted and IsMounted() then
-    self:HideAllIcons(true)
-    return
-  end
+  if CheckMountedState() then return end
 
   if event == "SPELL_UPDATE_USABLE" then
     ApplyShowBehavior()
@@ -245,3 +300,4 @@ CooldownCursor:RegisterEvent("SPELL_UPDATE_CHARGES")
 CooldownCursor:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 CooldownCursor:RegisterEvent("UI_SCALE_CHANGED")
 CooldownCursor:RegisterEvent("DISPLAY_SIZE_CHANGED")
+CooldownCursor:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")

@@ -1981,6 +1981,92 @@ local options = {
           end,
           order = 91,
         },
+
+        spacer3 = {
+          type = "description",
+          name = " ",
+          order = 95,
+        },
+
+        utilityHeader = {
+          type = "header",
+          name = "Utility",
+          order = 100,
+        },
+
+        exportSettings = {
+          type = "execute",
+          name = "Export Settings to Chat",
+          desc = "Dumps all your current settings to the chat window.\n\n" ..
+              "Use this to share your configuration with others or when reporting issues to the developer.",
+          order = 105,
+          func = function()
+            CooldownCursor:ExportSettings()
+          end,
+        },
+
+        spacer4 = {
+          type = "description",
+          name = " ",
+          order = 106,
+        },
+
+        exportStringHeader = {
+          type = "header",
+          name = "Share Configuration",
+          order = 107,
+        },
+
+        exportStringDesc = {
+          type = "description",
+          name = "Generate a copyable string of your settings to share with others.\n\n" ..
+              "|cffaaaaaaTip: Click the button below, then click in the text box, press Ctrl+A to select all, and Ctrl+C to copy.|r",
+          order = 108,
+        },
+
+        generateExportString = {
+          type = "execute",
+          name = "Generate Export String",
+          desc = "Creates a copyable string containing all your settings.",
+          order = 109,
+          width = "normal",
+          func = function()
+            CooldownCursor._exportString = CooldownCursor:SerializeSettings()
+            CooldownCursor:NotifyOptionsChanged()
+          end,
+        },
+
+        exportString = {
+          type = "input",
+          name = "Settings String",
+          desc = "Click in the box, press Ctrl+A to select all, then Ctrl+C to copy.",
+          order = 110,
+          width = "full",
+          multiline = 8,
+          get = function()
+            return CooldownCursor._exportString or "Click 'Generate Export String' above to create a shareable settings string."
+          end,
+          set = function() end, -- Read-only
+        },
+
+        spacer5 = {
+          type = "description",
+          name = " ",
+          order = 111,
+        },
+
+        reloadUI = {
+          type = "execute",
+          name = "Reload UI",
+          desc = "Reloads the user interface.\n\n" ..
+              "Use this after changing settings that require a reload (like Icon Pool Size).",
+          order = 105.5,
+          confirm = true,
+          confirmText = "Reload the UI now?",
+          func = function()
+            ReloadUI()
+          end,
+        },
       },
     },
 

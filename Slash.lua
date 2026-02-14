@@ -369,40 +369,171 @@ handlers.text = function(arg1, arg2)
   end
 end
 
+-- Expose a method on CooldownCursor for exporting settings
+function CooldownCursor:ExportSettings()
+  Print("======================================")
+  Print("CooldownCursor Settings Export")
+  Print("======================================")
+
+  -- Skip internal keys (those starting with _) and complex objects
+  local skipKeys = {
+    spellRules = true,
+    releaseNotes = true,
+  }
+
+  -- Collect and sort all setting keys
+  local sortedKeys = {}
+  for key, _ in pairs(CooldownCursorDB) do
+    -- Skip internal keys (starting with _) and skipped keys
+    if not key:match("^_") and not skipKeys[key] then
+      table.insert(sortedKeys, key)
+    end
+  end
+  table.sort(sortedKeys)
+
+  -- Function to format value for display
+  local function FormatValue(value)
+    local valueType = type(value)
+
+    if valueType == "boolean" then
+      return value and "true" or "false"
+    elseif valueType == "number" then
+      return tostring(value)
+    elseif valueType == "string" then
+      return value
+    elseif valueType == "table" then
+      return "[table]"
+    else
+      return tostring(value)
+    end
+  end
+
+  -- Print all settings
+  for _, key in ipairs(sortedKeys) do
+    local value = CooldownCursorDB[key]
+    Print("   " .. key .. ":", FormatValue(value))
+  end
+
+  -- Handle spell rules separately
+  if CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules then
+    Print("")
+    Print("Spell Rules:")
+    local ruleCount = 0
+    local sortedRules = {}
+
+    for spellID, rule in pairs(CooldownCursorDB.spellRules.rules) do
+      if type(spellID) == "number" then
+        ruleCount = ruleCount + 1
+        table.insert(sortedRules, {spellID = spellID, rule = rule})
+      end
+    end
+
+    -- Sort by spell ID
+    table.sort(sortedRules, function(a, b) return a.spellID < b.spellID end)
+
+    for _, entry in ipairs(sortedRules) do
+      local spellID = entry.spellID
+      local rule = entry.rule
+      local info = C_Spell.GetSpellInfo(spellID)
+      local spellName = info and info.name or ("Unknown Spell " .. spellID)
+
+      local enabled = rule.enabled ~= false and "enabled" or "disabled"
+      local priority = rule.priority or 0
+      local iconSize = rule.iconSize or "default"
+
+      Print(string.format("   [%d] %s - %s (priority: %s, size: %s)",
+        spellID, spellName, enabled, tostring(priority), tostring(iconSize)))
+    end
+
+    Print(string.format("   Total: %d spell rule(s)", ruleCount))
+
+    -- Print spell rules settings
+    if CooldownCursorDB.spellRules.settings then
+      Print("")
+      Print("Spell Rules Settings:")
+      Print("   disableRules:", FormatValue(CooldownCursorDB.spellRules.settings.disableRules))
+    end
+  end
+
+  Print("======================================")
+end
+
+-- Generate a compact serialized string of all settings for sharing
+function CooldownCursor:SerializeSettings()
+  local parts = {}
+
+  -- Skip internal keys (those starting with _) and complex objects
+  local skipKeys = {
+    spellRules = true,
+    releaseNotes = true,
+  }
+
+  -- Collect and sort all setting keys
+  local sortedKeys = {}
+  for key, _ in pairs(CooldownCursorDB) do
+    if not key:match("^_") and not skipKeys[key] then
+      table.insert(sortedKeys, key)
+    end
+  end
+  table.sort(sortedKeys)
+
+  -- Function to escape special characters in strings
+  local function EscapeString(str)
+    return str:gsub("([\\;|])", "\\%1")
+  end
+
+  -- Serialize each setting
+  for _, key in ipairs(sortedKeys) do
+    local value = CooldownCursorDB[key]
+    local valueType = type(value)
+    local serializedValue
+
+    if valueType == "boolean" then
+      serializedValue = value and "1" or "0"
+    elseif valueType == "number" then
+      serializedValue = tostring(value)
+    elseif valueType == "string" then
+      serializedValue = EscapeString(value)
+    else
+      serializedValue = nil -- Skip tables and other types
+    end
+
+    if serializedValue then
+      table.insert(parts, key .. "=" .. serializedValue)
+    end
+  end
+
+  -- Add spell rules
+  if CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules then
+    local rules = {}
+    for spellID, rule in pairs(CooldownCursorDB.spellRules.rules) do
+      if type(spellID) == "number" then
+        local enabled = rule.enabled ~= false and "1" or "0"
+        local priority = rule.priority or 0
+        local iconSize = rule.iconSize or ""
+        local useGlobal = rule.useGlobalIconSize ~= false and "1" or "0"
+
+        table.insert(rules, string.format("%d:%s:%s:%s:%s",
+          spellID, enabled, priority, iconSize, useGlobal))
+      end
+    end
+
+    if #rules > 0 then
+      table.insert(parts, "spellRules=" .. table.concat(rules, "|"))
+    end
+
+    -- Add spell rules settings
+    if CooldownCursorDB.spellRules.settings then
+      local disableRules = CooldownCursorDB.spellRules.settings.disableRules and "1" or "0"
+      table.insert(parts, "spellRulesDisabled=" .. disableRules)
+    end
+  end
+
+  return table.concat(parts, ";")
+end
+
 handlers.status = function()
-  Print("Current Icon settings:")
-  Print("   alpha:", CooldownCursor:GetDBValue("iconAlpha"))
-  Print("   anchor:", CooldownCursor:GetDBValue("anchor"))
-  Print("   animation:", CooldownCursor:GetDBValue("animation") and "on" or "off")
-  Print("   cooldown swipe:", CooldownCursor:GetDBValue("showCooldownSwipe") and "on" or "off")
-  Print("   fade out:", CooldownCursor:GetDBValue("fadeOutDuration"))
-  Print("   hide after:", CooldownCursor:GetDBValue("hideAfter"))
-  Print("   hide cooldown numbers:", CooldownCursor:GetDBValue("hideCooldownNumbers") and "on" or "off")
-  Print("   icon:", CooldownCursor:GetDBValue("iconHide") and "hidden" or "shown")
-  Print("   show spell names:", CooldownCursor:GetDBValue("showSpellNames") and "on" or "off")
-  local show = CooldownCursor:GetDBValue("showWhen")
-  local showLabel = (show == 0 and "always") or (show == 1 and "in-combat") or "out-of-combat"
-  Print("   show mode:", show, "(", showLabel, ")")
-  Print("   frame strata:", CooldownCursor:GetDBValue("frameStrata"))
-  Print("   hide while mounted:", CooldownCursor:GetDBValue("hideWhileMounted") and "enabled" or "disabled")
-  Print("   size:", CooldownCursor:GetDBValue("iconSize"))
-  Print("   scale:", CooldownCursor:GetDBValue("scale"))
-  Print("Current Spelltext settings:")
-  Print("   alpha:", CooldownCursor:GetDBValue("spellTextAlpha"))
-  Print("   anchor:", CooldownCursor:GetDBValue("spellTextAnchor"))
-  Print("   color:", CooldownCursor:GetDBValue("spellTextColor"))
-  Print("   font:", CooldownCursor:GetDBValue("spellTextFont"))
-  Print("   font path:", CooldownCursor:GetDBValue("spellTextFontPath"))
-  Print("   ftype:", CooldownCursor:GetDBValue("spellTextFontType"))
-  Print("   size:", CooldownCursor:GetDBValue("spellTextSize"))
-  Print("Current Cooldown text settings:")
-  Print("   alpha:", CooldownCursor:GetDBValue("cooldownTextAlpha"))
-  Print("   anchor:", CooldownCursor:GetDBValue("cooldownTextAnchor"))
-  Print("   color:", CooldownCursor:GetDBValue("cooldownTextColor"))
-  Print("   font:", CooldownCursor:GetDBValue("cooldownTextFont"))
-  Print("   font path:", CooldownCursor:GetDBValue("cooldownTextFontPath"))
-  Print("   ftype:", CooldownCursor:GetDBValue("cooldownTextFontType"))
-  Print("   size:", CooldownCursor:GetDBValue("cooldownTextSize"))
+  CooldownCursor:ExportSettings()
 end
 
 handlers.version = function()

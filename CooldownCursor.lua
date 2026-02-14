@@ -237,6 +237,7 @@ end
 ----------------------------------------------------
 local previewActive = false
 local previewTicker = nil
+local previewIndicator = nil -- Banner frame to show "PREVIEW MODE"
 
 ----------------------------------------------------
 -- Defaults / SavedVariables
@@ -500,6 +501,18 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
         "Spells not known to your current spec are automatically hidden",
       }
     },
+    ["2.1.5"] = {
+      newFeatures = {
+        "Added 'Export Settings to Chat' button in Advanced > Utility for easy status sharing",
+        "Added 'Share Configuration' feature to generate copyable settings string for sharing",
+        "Added 'Reload UI' button in Advanced > Utility for quick interface reload",
+      },
+      fixes = {
+        "Fixed icon size not persisting correctly after UI reload when using Masque",
+        "Improved Masque integration with lazy registration for better performance",
+        "Fixed 'Hide While Mounted' to actively hide existing icons instead of only preventing new ones",
+      },
+    },
     ["2.1.4"] = {
       fixes = {
         "Performance optimizations for smoother cursor icon tracking and reduced memory allocations",
@@ -634,6 +647,12 @@ local function CreateIconFrame(index)
   iconFrame.chargeText = iconFrame.chargeOverlay:CreateFontString(nil, "OVERLAY")
   iconFrame.chargeText:Hide()
 
+  -- Preview mode indicator text
+  iconFrame.previewText = iconFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  iconFrame.previewText:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -2, -10)
+  iconFrame.previewText:SetText("|cff00ff00PREVIEW|r")
+  iconFrame.previewText:Hide()
+
   iconFrame.showAnim = iconFrame:CreateAnimationGroup()
   local scaleUp = iconFrame.showAnim:CreateAnimation("Scale")
   scaleUp:SetOrder(1)
@@ -761,6 +780,11 @@ function ReturnIconToPool(iconFrame)
   iconFrame.procActive = false
   iconFrame.procOnly = false
 
+  -- Hide preview text
+  if iconFrame.previewText then
+    iconFrame.previewText:Hide()
+  end
+
   if iconFrame.hideTimer then
     iconFrame.hideTimer:Cancel()
     iconFrame.hideTimer = nil
@@ -774,6 +798,20 @@ end
 ----------------------------------------------------
 local Masque = LibStub and LibStub("Masque", true)
 local MasqueGroup = Masque and Masque:Group(addonName)
+local registeredWithMasque = {}
+
+-- Lazy registration: only add icons to Masque when they're actually used
+local function EnsureMasqueButton(iconFrame)
+  if not MasqueGroup or not iconFrame then return end
+
+  if not registeredWithMasque[iconFrame] then
+    MasqueGroup:AddButton(iconFrame, {
+      Icon = iconFrame.icon,
+      Cooldown = iconFrame.cooldown,
+    })
+    registeredWithMasque[iconFrame] = true
+  end
+end
 
 ----------------------------------------------------
 --- LibSharedMedia support
@@ -1522,6 +1560,9 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
 
   CooldownCursor:UpdateSingleIcon(iconFrame, spellID)
 
+  -- Register with Masque after size is set (lazy registration)
+  EnsureMasqueButton(iconFrame)
+
   iconFrame.icon:SetTexture(spellInfo.iconID)
 
   -- Proc-only spells have no real cooldown - hide the timer overlay
@@ -1561,6 +1602,11 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
     local showProcs = CooldownCursorDB.global.showProcs ~= false
     local showOutline = IsProcOutlineEnabled()
     iconFrame.procOutline:SetShown(showProcs and showOutline and procActive)
+  end
+
+  -- Show preview text if in preview mode
+  if previewActive and iconFrame.previewText then
+    iconFrame.previewText:Show()
   end
 
   return iconFrame, iconData
@@ -2056,17 +2102,6 @@ end
 
 function CooldownCursor:InitMultiIconSystem()
   InitializeIconPool()
-
-
-  -- Apply Masque to all icons in the pool
-  if MasqueGroup and #iconPool > 0 then
-    for _, iconFrame in ipairs(iconPool) do
-      MasqueGroup:AddButton(iconFrame, {
-        Icon = iconFrame.icon,
-        Cooldown = iconFrame.cooldown,
-      })
-    end
-  end
 end
 
 function CooldownCursor:GetValidSortOrders()
@@ -2112,6 +2147,27 @@ function CooldownCursor:GetValidStackGrowth()
 end
 
 ----------------------------------------------------
+-- Preview Mode Indicator
+----------------------------------------------------
+local function ShowPreviewIndicator()
+  -- Show preview text on all active icons
+  for _, iconData in ipairs(iconsByPriority) do
+    if iconData.iconFrame and iconData.iconFrame.previewText then
+      iconData.iconFrame.previewText:Show()
+    end
+  end
+end
+
+local function HidePreviewIndicator()
+  -- Hide preview text on all active icons
+  for _, iconData in ipairs(iconsByPriority) do
+    if iconData.iconFrame and iconData.iconFrame.previewText then
+      iconData.iconFrame.previewText:Hide()
+    end
+  end
+end
+
+----------------------------------------------------
 -- Live Preview API
 ----------------------------------------------------
 local function StopPreview()
@@ -2120,10 +2176,12 @@ local function StopPreview()
     previewTicker:Cancel()
     previewTicker = nil
   end
+  HidePreviewIndicator()
 end
 
 local function StartPreviewLoop(showFunc, intervalSeconds)
   previewActive = true
+  ShowPreviewIndicator()
   showFunc()
   previewTicker = C_Timer.NewTicker(intervalSeconds, function()
     if previewActive then
@@ -2443,6 +2501,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   end
 
   if CooldownCursorDB.global.hideWhileMounted and IsMounted() then
+    self:HideAllIcons(true)
     return
   end
 

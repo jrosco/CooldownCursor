@@ -92,7 +92,6 @@ local SPELL_EVENTS = {
 local pendingSpellTimers = {}
 
 CooldownCursor:SetScript("OnEvent", function(self, event, ...)
-  print("CooldownCursor: Event - " .. event)
   local unit
   if event == "ADDON_LOADED" then
     local name = ...

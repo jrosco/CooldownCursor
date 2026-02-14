@@ -38,6 +38,21 @@ local function GetRuleDisplayColor(enabled)
   return "ff5555", "(disabled)"
 end
 
+-- Helper to get class-specific rules for the current player
+local function GetClassRulesForUI()
+  CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or {}
+  CooldownCursorDB.spellRules.rules = CooldownCursorDB.spellRules.rules or {}
+
+  local class = CooldownCursor:GetPlayerClass()
+  if not class then return {} end
+
+  if not CooldownCursorDB.spellRules.rules[class] then
+    CooldownCursorDB.spellRules.rules[class] = {}
+  end
+
+  return CooldownCursorDB.spellRules.rules[class]
+end
+
 function CooldownCursor:RebuildSpellRuleOptions()
   local group = self.options.args.spellRulesGroup
   local args = group.args
@@ -49,13 +64,14 @@ function CooldownCursor:RebuildSpellRuleOptions()
     end
   end
 
-  CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or { rules = {} }
+  -- Get class-specific rules
+  local classRules = GetClassRulesForUI()
 
   -- Build sortable list
   local sorted = {}
 
-  for spellID, rule in pairs(CooldownCursorDB.spellRules.rules) do
-    if type(spellID) == "number" and IsPlayerSpell(spellID) then
+  for spellID, rule in pairs(classRules) do
+    if type(spellID) == "number" and C_SpellBook.IsSpellKnown(spellID) then
       local info = C_Spell.GetSpellInfo(spellID)
       local name = info and info.name or ("SpellID " .. spellID)
       local icon = info and info.originalIconID or nil
@@ -71,8 +87,8 @@ function CooldownCursor:RebuildSpellRuleOptions()
 
   -- Sort by priority (higher first), then alphabetically for priority 0
   table.sort(sorted, function(a, b)
-    local aPriority = a.rule.priority or 0
-    local bPriority = b.rule.priority or 0
+    local aPriority = (a.rule.settings and a.rule.settings.priority) or 0
+    local bPriority = (b.rule.settings and b.rule.settings.priority) or 0
 
     -- Spells with priority > 0 come before priority 0
     if aPriority > 0 and bPriority == 0 then
@@ -97,10 +113,11 @@ function CooldownCursor:RebuildSpellRuleOptions()
   for _, entry in ipairs(sorted) do
     local spellID = entry.spellID
     local rule = entry.rule
+    local settings = rule.settings or {}
     local name = entry.name
-    local enabled = rule.enabled
+    local enabled = settings.enabled
     local icon = entry.icon
-    local priority = rule.priority or 0
+    local priority = settings.priority or 0
     local color, suffix = GetRuleDisplayColor(enabled)
     local priorityText = priority > 0 and ("|cffaaaaaa[%d]|r "):format(priority) or ""
     name = ("%s|cff%s%s %s|r"):format(priorityText, color, name, suffix)
@@ -119,9 +136,9 @@ function CooldownCursor:RebuildSpellRuleOptions()
           name = "Enabled",
           desc = "When enabled, this spell will show cooldowns at your cursor.",
           order = 10,
-          get = function() return rule.enabled ~= false end,
+          get = function() return settings.enabled ~= false end,
           set = function(_, v)
-            rule.enabled = v
+            settings.enabled = v
             self:UpdateDisplay()
             self:RebuildSpellRuleOptions()
             self:NotifyOptionsChanged()
@@ -139,13 +156,13 @@ function CooldownCursor:RebuildSpellRuleOptions()
           disabled = function()
             return CooldownCursor:GetDBValue("stackDirection") == "SINGLE" or
                 CooldownCursorDB.spellRules.settings.disableRules or
-                not rule.enabled
+                not settings.enabled
           end,
           get = function()
-            return rule.priority or 0
+            return settings.priority or 0
           end,
           set = function(_, v)
-            rule.priority = v
+            settings.priority = v
             self:UpdateDisplay()
             -- Debounce the rebuild so slider moves smoothly
             if priorityRebuildTimer then
@@ -179,14 +196,14 @@ function CooldownCursor:RebuildSpellRuleOptions()
           max = 128,
           step = 1,
           disabled = function()
-            return rule.useGlobalIconSize ~= false or not rule.enabled
+            return settings.useGlobalIconSize ~= false or not settings.enabled
           end,
           get = function()
-            return rule.iconSize or CooldownCursor:GetDBValue("iconSize")
+            return settings.iconSize or CooldownCursor:GetDBValue("iconSize")
           end,
           set = function(_, v)
-            rule.iconSize = v
-            rule.useGlobalIconSize = false -- auto-disable inheritance
+            settings.iconSize = v
+            settings.useGlobalIconSize = false -- auto-disable inheritance
             self:UpdateDisplay()
           end,
         },
@@ -197,12 +214,12 @@ function CooldownCursor:RebuildSpellRuleOptions()
           desc = "Use the global icon size instead of a per-spell value.",
           order = 23,
           get = function()
-            return rule.useGlobalIconSize ~= false
+            return settings.useGlobalIconSize ~= false
           end,
           set = function(_, v)
-            rule.useGlobalIconSize = v
+            settings.useGlobalIconSize = v
             if v then
-              rule.iconSize = nil
+              settings.iconSize = nil
             end
             self:UpdateDisplay()
           end,
@@ -273,26 +290,46 @@ end
 
 local function ShowBehaviorValues()
   return {
-    [0] = "Auto-Hide After",
-    [1] = "On Cooldown",
-    [2] = "Off Cooldown (Ready)",
+    [0] = "On Cooldown",
+    [1] = "Off Cooldown (Ready)",
+    [2] = "Auto-Hide After",
   }
+end
+
+local function ProcOverlayAtlasValues()
+  local values = {}
+  local settings = CooldownCursor:GetProcOverlayAtlasSettings() or {}
+  values["none"] = "None"
+  for atlas, data in pairs(settings) do
+    values[atlas] = (data and data.name) or atlas
+  end
+  return values
+end
+
+local function ProcOutlineAtlasValues()
+  local values = {}
+  local settings = CooldownCursor:GetProcOutlineAtlasSettings() or {}
+  values["none"] = "None"
+  for atlas, data in pairs(settings) do
+    values[atlas] = (data and data.name) or atlas
+  end
+  return values
 end
 
 -- Helper to set smart defaults when Display Mode changes
 local function ApplyDisplayModeDefaults(newMode)
   if newMode == "HORIZONTAL" then
     -- Default to RIGHT growth with TOPRIGHT anchor
-    CooldownCursorDB.stackGrowth = "RIGHT"
-    CooldownCursorDB.anchor = "TOPRIGHT"
+    CooldownCursorDB.global.stackGrowth = "RIGHT"
+    CooldownCursorDB.global.anchor = "TOPRIGHT"
   elseif newMode == "VERTICAL" then
     -- Default to DOWN growth with BOTTOM anchor
-    CooldownCursorDB.stackGrowth = "DOWN"
-    CooldownCursorDB.anchor = "BOTTOM"
+    CooldownCursorDB.global.stackGrowth = "DOWN"
+    CooldownCursorDB.global.anchor = "BOTTOM"
   elseif newMode == "RADIUS" then
     -- Default to CLOCKWISE growth with CENTER anchor
-    CooldownCursorDB.stackGrowth = "CLOCKWISE"
-    CooldownCursorDB.anchor = "CENTER"
+    CooldownCursorDB.global.stackGrowth = "CLOCKWISE"
+    CooldownCursorDB.global.anchor = "CENTER"
   end
   -- SINGLE mode: no automatic changes
 end
@@ -392,6 +429,37 @@ local options = {
           end,
         },
 
+        showProcs = {
+          type = "toggle",
+          name = "Show Procs",
+          desc = "Enable proc detection for spells that can glow.\n\n" ..
+              "If disabled, proc visuals are hidden and proc-only icons are hidden.\n\n" .. 
+              "|cffff0000NOTE: Spells must be added to the Spell Rules|r",
+          order = 4.1,
+          width = "normal",
+          get = function() return CooldownCursor:GetDBValue("showProcs") end,
+          set = function(_, v)
+            CooldownCursor:SetDBBoolean("showProcs", v)
+            if not v then
+              CooldownCursor:ClearProcStates(true)
+            end
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
+        showCharges = {
+          type = "toggle",
+          name = "Show Charges",
+          desc = "Display the current charge count on spell icons for spells with multiple charges.",
+          order = 4.2,
+          width = "normal",
+          get = function() return CooldownCursor:GetDBValue("showCharges") end,
+          set = function(_, v)
+            CooldownCursor:SetDBBoolean("showCharges", v)
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
         enabledWarning = {
           type = "description",
           name = function()
@@ -466,10 +534,10 @@ local options = {
 
         showBehavior = {
           type = "select",
-          name = "Show Behavior |cff345BFF(Experimental)|r",
-          desc = "On Cooldown |cffFF1E34(Experimental)|r - Icons appear when a spell goes on cooldown.\n\n" ..
-              "Off Cooldown |cffFF1E34(Experimental)|r - Icons appear when a spell comes off cooldown and is ready to use again.\n\n" ..
-              "Auto-Hide After |cffFFFFFF(Default/Legacy)|r - Icons appear when a spell goes on cooldown and automatically disappear after a set time. See 'Auto-Hide After' option.",
+          name = "Show Behavior",
+          desc = "On Cooldown - Icons appear when a spell goes on cooldown.\n\n" ..
+              "Off Cooldown - Icons appear when a spell comes off cooldown and is ready to use again.\n\n" ..
+              "Auto-Hide After - Icons appear when a spell goes on cooldown and automatically disappear after a set time. See 'Auto-Hide After' option.",
           order = 25,
           width = "normal",
           values = ShowBehaviorValues(),
@@ -490,7 +558,7 @@ local options = {
           max = 120,
           step = 1,
           disabled = function()
-            return CooldownCursor:GetDBValue("showBehavior") ~= 0
+            return CooldownCursor:GetDBValue("showBehavior") ~= 2
           end,
           get = function() return CooldownCursor:GetDBValue("hideAfter") end,
           set = function(_, v) CooldownCursor:SetHideAfter(v) end,
@@ -683,11 +751,62 @@ local options = {
           type = "toggle",
           name = "Pop Animation",
           desc = "Icons briefly scale up when they appear.",
-          order = 50,
+          order = 54,
           width = "normal",
           get = function() return CooldownCursor:GetDBValue("animation") end,
           set = function(_, v) CooldownCursor:SetDBBoolean("animation", v) end,
         },
+
+        procOverlayAtlas = {
+          type = "select",
+          name = "Proc Overlay Atlas",
+          desc = "Select the atlas used for the proc overlay glow.\n\nEnable 'Show Procs' in Quick Settings to see proc visuals and options.",
+          order = 50,
+          width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,
+          values = ProcOverlayAtlasValues(),
+          get = function() return CooldownCursor:GetDBValue("procOverlayAtlas") end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("procOverlayAtlas", v)
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
+        procOverlayColor = {
+          type = "color",
+          name = "Proc Overlay Color",
+          desc = "Tint color for the proc overlay glow.",
+          order = 50.5,
+          disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,
+          get = function() return HexColorGet("procOverlayColor", "FFFFFF") end,
+          set = function(_, r, g, b, a) HexColorSet("procOverlayColor", r, g, b, a) end,
+        },
+
+        procOutlineAtlas = {
+          type = "select",
+          name = "Proc Outline Atlas",
+          desc = "Select the atlas used for the proc outline border.\n\nEnable 'Show Procs' in Quick Settings to see proc visuals and options.",
+          order = 51,
+          width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,
+          values = ProcOutlineAtlasValues(),
+          get = function() return CooldownCursor:GetDBValue("procOutlineAtlas") end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("procOutlineAtlas", v)
+            CooldownCursor:UpdateDisplay()
+          end,
+        },
+
+        procOutlineColor = {
+          type = "color",
+          name = "Proc Outline Color",
+          desc = "Tint color for the proc outline border.",
+          order = 51.5,
+          disabled = function() return CooldownCursor:GetDBValue("showProcs") == false end,
+          get = function() return HexColorGet("procOutlineColor", "FFFFFF") end,
+          set = function(_, r, g, b, a) HexColorSet("procOutlineColor", r, g, b, a) end,
+        },
+
 
         fadeOutDuration = {
           type = "range",
@@ -1206,6 +1325,76 @@ local options = {
           get = function() return CooldownCursor:GetDBValue("cooldownTextAnchor") end,
           set = function(_, v) CooldownCursor:SetDBString("cooldownTextAnchor", v) end,
         },
+
+        -- Charge Count section
+        chargeCountHeader = {
+          type = "header",
+          name = "Charge Count",
+          order = 110,
+        },
+
+        chargeTextSize = {
+          type = "range",
+          name = "Font Size",
+          desc = "Size of the charge count text.",
+          order = 120,
+          min = 6,
+          max = 32,
+          step = 1,
+          width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
+          get = function() return CooldownCursor:GetDBValue("chargeTextSize") end,
+          set = function(_, v) CooldownCursor:SetDBNumber("chargeTextSize", v) end,
+        },
+
+        chargeTextFont = {
+          type = "select",
+          name = "Font",
+          desc = "Font used for the charge count text.",
+          order = 130,
+          width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
+          values = FontValues,
+          get = function() return CooldownCursor:GetDBValue("chargeTextFont") end,
+          set = function(_, v) CooldownCursor:SetFontPath("chargeTextFont", v) end,
+        },
+
+        chargeTextFontType = {
+          type = "select",
+          name = "Font Type",
+          desc = "Font outline type for the charge count text.",
+          order = 140,
+          width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
+          values = fontTypeValues,
+          get = function() return CooldownCursor:GetDBValue("chargeTextFontType") end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("chargeTextFontType", v)
+          end,
+        },
+
+        chargeTextColor = {
+          type = "color",
+          name = "Color",
+          hasAlpha = false,
+          order = 150,
+          width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
+          get = function() return HexColorGet("chargeTextColor", "FFFFFF") end,
+          set = function(_, r, g, b, a) HexColorSet("chargeTextColor", r, g, b, a) end,
+        },
+
+        chargeTextAnchor = {
+          type = "select",
+          name = "Position",
+          desc = "Where to position the charge count on the icon.",
+          order = 160,
+          width = "normal",
+          disabled = function() return CooldownCursor:GetDBValue("showCharges") == false end,
+          values = AnchorValues,
+          get = function() return CooldownCursor:GetDBValue("chargeTextAnchor") end,
+          set = function(_, v) CooldownCursor:SetDBString("chargeTextAnchor", v) end,
+        },
       },
     },
 
@@ -1215,10 +1404,61 @@ local options = {
       order = 400,
       args = {
 
+        classHeader = {
+          type = "description",
+          name = function()
+            local class = CooldownCursor:GetPlayerClass()
+            if class then
+              -- Class colors (approximate WoW class colors)
+              local classColors = {
+                WARRIOR = "C69B6D",
+                PALADIN = "F48CBA",
+                HUNTER = "AAD372",
+                ROGUE = "FFF468",
+                PRIEST = "FFFFFF",
+                DEATHKNIGHT = "C41E3A",
+                SHAMAN = "0070DD",
+                MAGE = "3FC7EB",
+                WARLOCK = "8788EE",
+                MONK = "00FF98",
+                DRUID = "FF7C0A",
+                DEMONHUNTER = "A330C9",
+                EVOKER = "33937F",
+              }
+              local color = classColors[class] or "FFFFFF"
+              return string.format("|cff%s%s|r Spell Rules", color, class:gsub("^%l", string.upper):gsub("(%u)", " %1"):sub(2))
+            end
+            return "Spell Rules"
+          end,
+          fontSize = "large",
+          order = 399,
+        },
+
+        specHeader = {
+          type = "description",
+          name = function()
+            local specIndex = GetSpecialization()
+            if specIndex then
+              local _, specName, _, specIcon = GetSpecializationInfo(specIndex)
+              if specName then
+                local iconText = specIcon and string.format("|T%d:16:16:0:0|t ", specIcon) or ""
+                return string.format("%s|cffffff00%s|r Specialization", iconText, specName)
+              end
+            end
+            return ""
+          end,
+          fontSize = "medium",
+          order = 399.5,
+        },
+
         rulesDescription = {
           type = "description",
-          name = "Manage which spells show cooldowns at your cursor.\n\n" ..
-              "|cffaaaaaaTip: Only spells added to rules will show cooldowns. Add spells below to enable tracking.|r",
+          name = function()
+            local class = CooldownCursor:GetPlayerClass()
+            local classText = class and string.format(" for your |cffffd100%s|r", class:lower():gsub("^%l", string.upper)) or ""
+            return "Manage which spells show cooldowns at your cursor" .. classText .. ".\n\n" ..
+                "|cffaaaaaaTip: Spells not known to your current spec are automatically hidden.|r"
+          end,
           order = 400,
         },
 
@@ -1256,7 +1496,9 @@ local options = {
               return { [0] = "|cff888888-- Not available in combat --|r" }
             end
             local values = { [0] = "|cff888888-- Select a spell --|r" }
-            local spells = CooldownCursor:GetCooldownSpells(true, 1.5, true)
+            local includeNoCooldown = CooldownCursor._includeNoCooldownSpells ~= false
+            local includePets = CooldownCursor._includePetSpells or false
+            local spells = CooldownCursor:GetCooldownSpells(includePets, 0, true, includeNoCooldown)
 
             for _, spell in ipairs(spells) do
               if spell.spellID and spell.name then
@@ -1274,7 +1516,9 @@ local options = {
           end,
           sorting = function()
             -- Return spellIDs sorted alphabetically by spell name
-            local spells = CooldownCursor:GetCooldownSpells(true, 1.5, true)
+            local includeNoCooldown = CooldownCursor._includeNoCooldownSpells ~= false
+            local includePets = CooldownCursor._includePetSpells or false
+            local spells = CooldownCursor:GetCooldownSpells(includePets, 0, true, includeNoCooldown)
             table.sort(spells, function(a, b)
               return (a.name or ""):lower() < (b.name or ""):lower()
             end)
@@ -1301,12 +1545,51 @@ local options = {
           end,
         },
 
+        includePetSpells = {
+          type = "toggle",
+          name = "Pet Spells",
+          desc = "Include pet spells in the dropdown list.",
+          order = 418.5,
+          width = "normal",
+          disabled = function()
+            return InCombatLockdown()
+          end,
+          get = function()
+            return CooldownCursor._includePetSpells or false
+          end,
+          set = function(_, v)
+            CooldownCursor._includePetSpells = v
+            CooldownCursor._selectedSpellbookSpell = 0
+            CooldownCursor:NotifyOptionsChanged()
+          end,
+        },
+
+        includeNoCooldownSpells = {
+          type = "toggle",
+          name = "Non-Cooldown Spells",
+          desc = "Show spells without cooldowns in the dropdown list.\n\n" ..
+              "Useful for adding spells that don't have a base cooldown (e.g. procs, buffs).",
+          order = 418,
+          width = "normal",
+          disabled = function()
+            return InCombatLockdown()
+          end,
+          get = function()
+            return CooldownCursor._includeNoCooldownSpells ~= false
+          end,
+          set = function(_, v)
+            CooldownCursor._includeNoCooldownSpells = v
+            CooldownCursor._selectedSpellbookSpell = 0
+            CooldownCursor:NotifyOptionsChanged()
+          end,
+        },
+
         addFromSpellbook = {
           type = "execute",
           name = "Add",
           desc = "Add the selected spell to your rules.\n\n" ..
               "|cffaaaaaaTip: Select a spell from the dropdown first.|r",
-          order = 418,
+          order = 417.5,
           width = "half",
           func = function()
             local spellID = CooldownCursor._selectedSpellbookSpell
@@ -1639,15 +1922,27 @@ local options = {
 
         clearAllSpellRules = {
           type = "execute",
-          name = "Clear All Spell Rules",
-          desc = "Remove all spell rules you have added.\n\n" ..
-              "|cffff8800Warning:|r This cannot be undone!",
+          name = function()
+            local class = CooldownCursor:GetPlayerClass()
+            if class then
+              return "Clear " .. class:gsub("^%l", string.upper):gsub("(%u)", " %1"):sub(2) .. " Spell Rules"
+            end
+            return "Clear All Spell Rules"
+          end,
+          desc = function()
+            local class = CooldownCursor:GetPlayerClass()
+            local classText = class and string.format(" for your %s", class:lower():gsub("^%l", string.upper)) or ""
+            return "Remove all spell rules" .. classText .. ".\n\n" ..
+                "|cffff8800Warning:|r This cannot be undone!"
+          end,
           order = 70,
           confirm = true,
-          confirmText = "Are you sure you want to delete ALL spell rules? This cannot be undone.",
+          confirmText = "Are you sure you want to delete ALL spell rules for this class? This cannot be undone.",
           func = function()
-            CooldownCursorDB.spellRules = CooldownCursorDB.spellRules or {}
-            CooldownCursorDB.spellRules.rules = {}
+            local class = CooldownCursor:GetPlayerClass()
+            if class and CooldownCursorDB.spellRules and CooldownCursorDB.spellRules.rules then
+              CooldownCursorDB.spellRules.rules[class] = {}
+            end
             CooldownCursor:RebuildSpellRuleOptions()
             CooldownCursor:NotifyOptionsChanged()
             CooldownCursor:UpdateDisplay()

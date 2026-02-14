@@ -331,19 +331,36 @@ local function InitializeIconPool()
 end
 
 local function GetIconFromPool()
+  local iconFrame
   if #State.iconPool > 0 then
-    return table.remove(State.iconPool, 1)
+    iconFrame = table.remove(State.iconPool, 1)
+  else
+    iconFrame = CreateIconFrame(State.nextIconID)
+    State.nextIconID = State.nextIconID + 1
   end
-  local newIcon = CreateIconFrame(State.nextIconID)
-  State.nextIconID = State.nextIconID + 1
-  return newIcon
+  iconFrame._inPool = false
+  return iconFrame
 end
 
 ReturnIconToPool = function(iconFrame)
   if not iconFrame then return end
 
+  -- Guard against double-return (same frame already in pool)
+  if iconFrame._inPool then return end
+  iconFrame._inPool = true
+
+  -- Stop any playing animations to prevent OnFinished from firing later
+  if iconFrame.showAnim then
+    iconFrame.showAnim:Stop()
+  end
+  if iconFrame.fadeOut then
+    iconFrame.fadeOut:Stop()
+  end
+
+  -- Reset the frame to a clean default state before it goes back into the pool
   iconFrame:Hide()
   iconFrame:SetScript("OnUpdate", nil)
+  iconFrame:SetScale(1)
   iconFrame.spellID = nil
   iconFrame.addedTime = nil
   iconFrame.priority = 0

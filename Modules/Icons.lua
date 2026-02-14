@@ -419,6 +419,7 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
 
   -- If this spell is an instant cast or has no cooldown, and it's not from a proc, don't create icon.
   if not fromProc and rule and not metadata.hasCooldown and not metadata.hasCharges then
+    ReturnIconToPool(iconFrame)
     return
   end
 

@@ -738,11 +738,11 @@ end
 ----------------------------------------------------
 -- Multi-Icon Stack Offset Calculation
 ----------------------------------------------------
-local function GetStackOffset(index, totalIcons)
-  local iconSize = CooldownCursorDB.iconSize or defaults.iconSize
-  local spacing = CooldownCursorDB.stackSpacing or defaults.stackSpacing
-  local direction = CooldownCursorDB.stackDirection or STACK_DIRECTION.VERTICAL
-  local growth = CooldownCursorDB.stackGrowth or STACK_GROWTH.DOWN
+local function GetStackOffset(index, totalIcons, spellID)
+  local iconSize = spellID and CooldownCursor:GetEffectiveIconSize(spellID) or CooldownCursorDB.global.iconSize or defaults.iconSize
+  local spacing = CooldownCursorDB.global.stackSpacing or defaults.stackSpacing
+  local direction = CooldownCursorDB.global.stackDirection or STACK_DIRECTION.VERTICAL
+  local growth = CooldownCursorDB.global.stackGrowth or STACK_GROWTH.DOWN
 
   -- For Radius layout
   if direction == STACK_DIRECTION.RADIUS then
@@ -1062,7 +1062,7 @@ function UpdateIconPositions()
       else
         -- Visible (or not repacking) - assign the next sequential slot
         local index = repackVisible and visibleIndex or (i - 1)
-        local offsetX, offsetY = GetStackOffset(index, visibleCount)
+        local offsetX, offsetY = GetStackOffset(index, visibleCount, iconData.spellID)
         iconFrame.stackOffsetX = offsetX
         iconFrame.stackOffsetY = offsetY
         visibleIndex = visibleIndex + 1

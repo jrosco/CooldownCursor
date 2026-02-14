@@ -263,8 +263,24 @@ end
 ----------------------------------------------------
 
 function Settings:HideAllIcons(immediate)
-  for spellID, _ in pairs(State.activeIcons) do
-    Internal.RemoveIconForSpell(spellID, immediate or false)
+  -- Directly clean up each icon frame instead of using RemoveIconForSpell,
+  -- which calls SortIcons/UpdateIconPositions after every single removal.
+  for _, iconData in ipairs(State.iconsByPriority) do
+    local iconFrame = iconData.iconFrame
+    if iconFrame then
+      if immediate or CooldownCursorDB.global.fadeOutDuration == 0 then
+        Internal.ReturnIconToPool(iconFrame)
+      else
+        if iconFrame.fadeOut then
+          iconFrame.fadeOut:Stop()
+          local fadeOutAnim = iconFrame.fadeOut:GetAnimations()
+          fadeOutAnim:SetDuration(CooldownCursorDB.global.fadeOutDuration or 0.3)
+          iconFrame.fadeOut:Play()
+        else
+          Internal.ReturnIconToPool(iconFrame)
+        end
+      end
+    end
   end
   State.activeIcons = {}
   State.iconsByPriority = {}

@@ -103,7 +103,7 @@ local SHOW_WHEN_STATE = {
 local SHOW_BEHAVIOR = {
   ON_COOLDOWN = 0,     -- Show on cooldown, remove icon when spell comes off cooldown
   OFF_COOLDOWN = 1,    -- Show only when spell is ready (off cooldown)
-  AUTO_HIDE_AFTER = 3, -- Show on cooldown, auto-hide after X seconds (default, original behaviour)
+  AUTO_HIDE_AFTER = 2, -- Show on cooldown, auto-hide after X seconds (default, original behaviour)
 }
 
 local ANCHOR_POSITION = {
@@ -487,6 +487,11 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   local _cleanedFlatRulesCheckMsg = CooldownCursorDB._migrated.cleanedFlatRules and "Your migration is marked cleaned" or
   "Your migration rules are pending cleanup"
   local releaseNotesByVersion = {
+    ["2.2.1"] = {
+      fixes = {
+        "Add SPELL_UPDATE_CHARGES event for better refreshing of charge counts",
+      },
+    },
     ["2.2.0"] = {
       breakingChanges = {
         "Settings have been moved to a 'global' subtable in SavedVariables - existing settings are automatically migrated",
@@ -2411,6 +2416,24 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     end
   end
 
+  if event == "SPELL_UPDATE_CHARGES" then
+    if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.NON_COMBAT and inCombat then
+      return
+    end
+    if CooldownCursorDB.global.showWhen == SHOW_WHEN_STATE.COMBAT and not inCombat then
+      return
+    end
+    if CooldownCursorDB.global.showCharges ~= false then
+      for spellID, iconData in pairs(activeIcons) do
+        if iconData and iconData.iconFrame and iconData.hasCharges then
+          UpdateChargeCount(iconData.iconFrame, spellID)
+        end
+      end
+      ApplyShowBehavior()
+    end
+    return
+  end
+
   if event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
     local spellID = ...
     if not spellID then return end
@@ -2583,6 +2606,7 @@ CooldownCursor:RegisterEvent("PLAYER_REGEN_DISABLED")
 CooldownCursor:RegisterEvent("PLAYER_REGEN_ENABLED")
 CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
 CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
+CooldownCursor:RegisterEvent("SPELL_UPDATE_CHARGES")
 CooldownCursor:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 CooldownCursor:RegisterEvent("UI_SCALE_CHANGED")
 CooldownCursor:RegisterEvent("DISPLAY_SIZE_CHANGED")

@@ -832,6 +832,32 @@ local options = {
           set = function(_, v) CooldownCursor:SetDBBoolean("showCooldownSwipe", v) end,
         },
 
+        cooldownSwipeColor = {
+          type = "color",
+          name = "Swipe Color",
+          desc = "Tint color for the cooldown swipe overlay.",
+          order = 61,
+          width = "normal",
+          hasAlpha = false,
+          disabled = function() return CooldownCursor:GetDBValue("showCooldownSwipe") == false end,
+          get = function() return HexColorGet("cooldownSwipeColor", "000000") end,
+          set = function(_, r, g, b, a) HexColorSet("cooldownSwipeColor", r, g, b, a) end,
+        },
+
+        cooldownSwipeAlpha = {
+          type = "range",
+          name = "Swipe Opacity",
+          desc = "Opacity of the cooldown swipe overlay.",
+          order = 62,
+          width = "normal",
+          min = 0,
+          max = 100,
+          step = 1,
+          disabled = function() return CooldownCursor:GetDBValue("showCooldownSwipe") == false end,
+          get = function() return CooldownCursor:GetDBValue("cooldownSwipeAlpha") end,
+          set = function(_, v) CooldownCursor:SetDBNumber("cooldownSwipeAlpha", v) end,
+        },
+
         iconHide = {
           type = "toggle",
           name = "Hide Icon Texture",

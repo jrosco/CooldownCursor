@@ -242,6 +242,11 @@ local function UpdateSingleIcon(self, icon, spellID)
 
   icon.cooldown:SetHideCountdownNumbers(CooldownCursorDB.global.hideCooldownNumbers)
   icon.cooldown:SetDrawSwipe(CooldownCursorDB.global.showCooldownSwipe)
+  if icon.cooldown.SetSwipeColor then
+    local swr, swg, swb = HexToRGB(CooldownCursorDB.global.cooldownSwipeColor or defaults.cooldownSwipeColor)
+    local swAlpha = PercentToAlpha(CooldownCursorDB.global.cooldownSwipeAlpha or defaults.cooldownSwipeAlpha)
+    icon.cooldown:SetSwipeColor(swr, swg, swb, swAlpha)
+  end
 
   if icon:IsShown() and icon.spellID then
     local info = C_Spell.GetSpellInfo(icon.spellID)

@@ -274,6 +274,11 @@ function Defaults:ApplyBreakingChangesAndSetReleaseNotes()
   local _cleanedFlatRulesCheckMsg = CooldownCursorDB._migrated.cleanedFlatRules and "Your migration is marked cleaned" or
   "Your migration rules are pending cleanup"
   local releaseNotesByVersion = {
+    ["2.2.2"] = {
+      fixes = {
+        "Event triggering with ApplyShowBehavior() when show out-of-combat / always enabled",
+      },
+    },
     ["2.2.1"] = {
       fixes = {
         "Fixed SPELL_UPDATE_CHARGES event not refreshing charge counts",

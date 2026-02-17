@@ -487,6 +487,11 @@ function CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
   local _cleanedFlatRulesCheckMsg = CooldownCursorDB._migrated.cleanedFlatRules and "Your migration is marked cleaned" or
   "Your migration rules are pending cleanup"
   local releaseNotesByVersion = {
+    ["2.2.2"] = {
+      fixes = {
+        "Event triggering with ApplyShowBehavior() when show out-of-combat / always enabled",
+      },
+    },
     ["2.2.1"] = {
       fixes = {
         "Add SPELL_UPDATE_CHARGES event for better refreshing of charge counts",
@@ -2530,12 +2535,14 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     return
   end
 
-  if event == "SPELL_UPDATE_USABLE" then
+  if event == "SPELL_UPDATE_USABLE" or event == "PLAYER_ENTERING_WORLD" then
     ApplyShowBehavior()
     return
   end
 
   if SPELL_EVENTS[event] then
+    -- Need a better way to handle this than checking in every event
+    ApplyShowBehavior()
     local spellID
     -- Check if addon is enabled
     if CooldownCursorDB.global.enabled == false then
@@ -2550,7 +2557,10 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       unit, _, spellID = ...
       if unit ~= "player" then return end
     end
-    if not spellID then return end
+    if not spellID then
+      ApplyShowBehavior()
+      return
+    end
 
     -- Check user spell rules before doing any cooldown queries
     local show, rule = CooldownCursor:GetSpellRule(spellID)
@@ -2611,3 +2621,4 @@ CooldownCursor:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
 CooldownCursor:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 CooldownCursor:RegisterEvent("UI_SCALE_CHANGED")
 CooldownCursor:RegisterEvent("DISPLAY_SIZE_CHANGED")
+CooldownCursor:RegisterEvent("PLAYER_ENTERING_WORLD")

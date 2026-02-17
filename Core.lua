@@ -368,6 +368,7 @@ ReturnIconToPool = function(iconFrame)
   iconFrame.stackOffsetY = 0
   iconFrame._lastX = nil
   iconFrame._lastY = nil
+  iconFrame.durationObject = nil
 
   -- Hide primary indicator
   if iconFrame.primaryBorder then

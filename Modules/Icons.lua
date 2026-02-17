@@ -130,6 +130,21 @@ end
 ----------------------------------------------------
 -- Update Single Icon Appearance
 ----------------------------------------------------
+local function ApplyCooldownSwipeSettings(iconFrame)
+  if not iconFrame or not iconFrame.cooldown then return end
+  if State.previewActive and iconFrame.durationObject and iconFrame.cooldown.SetCooldownFromDurationObject then
+    -- Re-apply current cooldown so swipe visuals refresh during preview updates
+    iconFrame.cooldown:SetCooldownFromDurationObject(iconFrame.durationObject)
+  end
+  iconFrame.cooldown:SetHideCountdownNumbers(CooldownCursorDB.global.hideCooldownNumbers)
+  iconFrame.cooldown:SetDrawSwipe(CooldownCursorDB.global.showCooldownSwipe)
+  if iconFrame.cooldown.SetSwipeColor then
+    local swr, swg, swb = HexToRGB(CooldownCursorDB.global.cooldownSwipeColor or defaults.cooldownSwipeColor)
+    local swAlpha = PercentToAlpha(CooldownCursorDB.global.cooldownSwipeAlpha or defaults.cooldownSwipeAlpha)
+    iconFrame.cooldown:SetSwipeColor(swr, swg, swb, swAlpha)
+  end
+end
+
 local function UpdateSingleIcon(self, icon, spellID)
   if not icon then return end
 
@@ -240,13 +255,7 @@ local function UpdateSingleIcon(self, icon, spellID)
     icon.procOutline:SetSize(size * scale * outlineScale, size * scale * outlineScale)
   end
 
-  icon.cooldown:SetHideCountdownNumbers(CooldownCursorDB.global.hideCooldownNumbers)
-  icon.cooldown:SetDrawSwipe(CooldownCursorDB.global.showCooldownSwipe)
-  if icon.cooldown.SetSwipeColor then
-    local swr, swg, swb = HexToRGB(CooldownCursorDB.global.cooldownSwipeColor or defaults.cooldownSwipeColor)
-    local swAlpha = PercentToAlpha(CooldownCursorDB.global.cooldownSwipeAlpha or defaults.cooldownSwipeAlpha)
-    icon.cooldown:SetSwipeColor(swr, swg, swb, swAlpha)
-  end
+  ApplyCooldownSwipeSettings(icon)
 
   if icon:IsShown() and icon.spellID then
     local info = C_Spell.GetSpellInfo(icon.spellID)
@@ -463,7 +472,9 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
     iconFrame.cooldown:SetDrawSwipe(false)
   else
     iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
+    ApplyCooldownSwipeSettings(iconFrame)
   end
+  iconFrame.durationObject = durationObject
 
   if CooldownCursorDB.global.showSpellNames and spellInfo.name then
     iconFrame.text:SetText(spellInfo.name)
@@ -540,6 +551,8 @@ ShowSpellIcon = function(spellID, durationObject, fromProc)
     if existingIcon then
       local iconFrame = existingIcon.iconFrame
       iconFrame.cooldown:SetCooldownFromDurationObject(durationObject)
+      ApplyCooldownSwipeSettings(iconFrame)
+      iconFrame.durationObject = durationObject
       existingIcon.durationObject = durationObject
       if not fromProc then
         existingIcon.procOnly = false

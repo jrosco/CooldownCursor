@@ -139,7 +139,7 @@ end
 
 local function PercentToAlpha(percent)
   local alpha = tonumber(percent)
-  if not alpha then return end
+  if not alpha then return 1 end
   if alpha > 1 then
     alpha = math.max(0, math.min(100, alpha)) / 100
   end

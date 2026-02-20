@@ -12,6 +12,7 @@ local ApplyShowBehavior = Internal.ApplyShowBehavior
 local RemoveIconForSpell = Internal.RemoveIconForSpell
 local UpdateChargeCount = Internal.UpdateChargeCount
 local RefreshScreenMetrics = Internal.RefreshScreenMetrics
+local ApplyPositionMode = Internal.ApplyPositionMode
 local IsProcOverlayEnabled = Internal.IsProcOverlayEnabled
 local IsProcOutlineEnabled = Internal.IsProcOutlineEnabled
 
@@ -100,6 +101,9 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     RefreshScreenMetrics()
     self:InitMultiIconSystem()
     self:UpdateDisplay()
+    if ApplyPositionMode then
+      ApplyPositionMode()
+    end
     self:InitAce3Options()
     self:UnregisterEvent("ADDON_LOADED")
     State.inCombat = InCombatLockdown()
@@ -236,11 +240,9 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     -- category, startRecoveryCategory. A nil spellID means all cooldowns
     -- should be refreshed (handled by the nil check below).
     if event == "SPELL_UPDATE_COOLDOWN" then
-      print("SPELL_UPDATE_COOLDOWN event received with args:", ...)
       spellID, _, _, _ = ...
     else
       if event == "UNIT_SPELLCAST_SENT" then
-        print("UNIT_SPELLCAST_SENT event received with args:", ...)
         unit, _, _, spellID = ...
       else
         unit, _, spellID = ...
@@ -252,7 +254,6 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       return
     end
 
-    print("Processing spellID:", spellID)
     -- Check user spell rules before doing any cooldown queries
     local show, rule = CooldownCursor:GetSpellRule(spellID)
     if not show then return end

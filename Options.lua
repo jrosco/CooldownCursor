@@ -1,5 +1,7 @@
 local addonName, addonTable = ...
 local CooldownCursor = addonTable.Frame
+local State = addonTable.State
+local Internal = addonTable.Internal
 local OPTIONS_APP_NAME = addonName
 
 local AceConfig = LibStub and LibStub("AceConfig-3.0", true)
@@ -843,16 +845,72 @@ local options = {
           set = function(_, v) CooldownCursor:SetDBBoolean("iconHide", v) end,
         },
 
-        spacer3 = {
-          type = "description",
-          name = " ",
-          order = 75,
-        },
+      },
+    },
 
-        positionHeader = {
+    -- ========================================
+    -- POSITION TAB
+    -- ========================================
+    positionGroup = {
+      type = "group",
+      name = "Position",
+      order = 150,
+      args = {
+
+        header = {
           type = "header",
           name = "Position",
-          order = 80,
+          order = 1,
+        },
+
+        description = {
+          type = "description",
+          name = "Configure where cooldown icons appear.\n\n" ..
+              "|cffaaaaaaTip: Screen mode uses a draggable anchor that is only visible in Preview/Options.|r",
+          order = 2,
+        },
+
+        spacer1 = {
+          type = "description",
+          name = " ",
+          order = 3,
+        },
+
+        positionMode = {
+          type = "select",
+          name = "Position Mode",
+          desc = "Choose how cooldown icons are positioned.\n\n" ..
+              "Cursor: follow the mouse cursor (default)\n" ..
+              "Screen: use a draggable anchor frame (shown only in Preview/Options)",
+          order = 10,
+          width = "normal",
+          values = function()
+            return CooldownCursor:GetValidPositionModes()
+          end,
+          get = function()
+            return CooldownCursor:GetDBValue("positionMode")
+          end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("positionMode", v)
+          end,
+        },
+
+        resetAnchor = {
+          type = "execute",
+          name = "Reset Anchor Position",
+          desc = "Reset the draggable anchor back to the screen center.",
+          order = 20,
+          width = "normal",
+          hidden = function()
+            return CooldownCursor:GetDBValue("positionMode") ~= "SCREEN"
+          end,
+          func = function()
+            CooldownCursorDB.global.offsetX = 0
+            CooldownCursorDB.global.offsetY = 0
+            if Internal and Internal.ApplyPositionMode then
+              Internal.ApplyPositionMode()
+            end
+          end,
         },
 
         anchor = {
@@ -860,9 +918,12 @@ local options = {
           name = "Anchor Point",
           desc = "Where to position the icon relative to your cursor.\n\n" ..
               "TOPLEFT = Icon appears above and left of cursor",
-          order = 90,
+          order = 30,
           width = "normal",
           values = AnchorValues,
+          disabled = function()
+            return CooldownCursor:GetDBValue("positionMode") == "SCREEN"
+          end,
           get = function() return CooldownCursor:GetDBValue("anchor") end,
           set = function(_, v) CooldownCursor:SetDBString("anchor", v) end,
         },
@@ -871,11 +932,14 @@ local options = {
           type = "range",
           name = "Cursor Distance",
           desc = "How far from the cursor the icon appears (in pixels).",
-          order = 100,
+          order = 40,
           width = "normal",
           min = 0,
           max = 100,
           step = 1,
+          disabled = function()
+            return CooldownCursor:GetDBValue("positionMode") == "SCREEN"
+          end,
           get = function() return CooldownCursor:GetDBValue("anchorPadding") end,
           set = function(_, v) CooldownCursor:SetDBNumber("anchorPadding", v) end,
         },
@@ -885,7 +949,7 @@ local options = {
         --   type = "range",
         --   name = "Horizontal Offset",
         --   desc = "Additional horizontal adjustment (negative = left, positive = right).",
-        --   order = 110,
+        --   order = 50,
         --   width = "normal",
         --   min = -500, max = 500, step = 1,
         --   get = function() return CooldownCursor:GetDBValue("offsetX") end,
@@ -896,13 +960,12 @@ local options = {
         --   type = "range",
         --   name = "Vertical Offset",
         --   desc = "Additional vertical adjustment (negative = down, positive = up).",
-        --   order = 120,
+        --   order = 60,
         --   width = "normal",
         --   min = -500, max = 500, step = 1,
         --   get = function() return CooldownCursor:GetDBValue("offsetY") end,
         --   set = function(_, v) CooldownCursor:SetDBNumber("offsetY", v) end,
         -- },
-
       },
     },
 
@@ -2120,13 +2183,21 @@ CooldownCursor.options = options
 
 function CooldownCursor:OnOptionsOpened()
   -- Options Panel Opened
+  State.optionsOpen = true
   self:RebuildSpellRuleOptions()
   CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
+  if Internal and Internal.UpdateAnchorVisibility then
+    Internal.UpdateAnchorVisibility()
+  end
 end
 
 function CooldownCursor:OnOptionsClosed()
   -- Options Panel Closed
+  State.optionsOpen = false
   CooldownCursor:SetPreviewMouseMode(true)
+  if Internal and Internal.UpdateAnchorVisibility then
+    Internal.UpdateAnchorVisibility()
+  end
 end
 
 function CooldownCursor:isAceConfigLoaded()

@@ -160,7 +160,7 @@ local function ApplyShowBehavior()
             iconFrame:SetAlpha(0)
           end
         else
-          iconFrame:SetAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha)
+          iconFrame:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha))
         end
       end
     end

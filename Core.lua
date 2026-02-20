@@ -328,12 +328,13 @@ local function InitializeIconPool()
     local iconFrame = CreateIconFrame(i)
     table.insert(State.iconPool, iconFrame)
   end
+  State.nextIconID = poolSize + 1
 end
 
 local function GetIconFromPool()
   local iconFrame
   if #State.iconPool > 0 then
-    iconFrame = table.remove(State.iconPool, 1)
+    iconFrame = table.remove(State.iconPool)
   else
     iconFrame = CreateIconFrame(State.nextIconID)
     State.nextIconID = State.nextIconID + 1

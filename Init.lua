@@ -109,7 +109,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   if event == "PLAYER_SPECIALIZATION_CHANGED" then
     unit = ...
     if unit == "player" then
-      State.knownSpellCache = {}
+      wipe(State.knownSpellCache)
       CooldownCursor:HideAllIcons(true)
       ApplyShowBehavior()
       return
@@ -225,16 +225,16 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
   end
 
   if SPELL_EVENTS[event] then
-    -- Need a better way to handle this than checking in every event
-    ApplyShowBehavior()
-    local spellID
     -- Check if addon is enabled
     if CooldownCursorDB.global.enabled == false then
       return
     end
 
-    -- SPELL_UPDATE_COOLDOWN will update cooldown
-    -- that buffs, talents or items may trigger new updated CD times.
+    local spellID
+
+    -- SPELL_UPDATE_COOLDOWN (11.1.5+) provides spellID, baseSpellID,
+    -- category, startRecoveryCategory. A nil spellID means all cooldowns
+    -- should be refreshed (handled by the nil check below).
     if event == "SPELL_UPDATE_COOLDOWN" then
       spellID, _, _, _ = ...
     else

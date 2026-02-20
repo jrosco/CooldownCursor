@@ -67,6 +67,9 @@ addonTable.State = {
   previewActive = false,
   previewTicker = nil,
 
+  -- Options panel state
+  optionsOpen = false,
+
   -- Proc state
   activeProcSpells = {},
   procCapableSpells = {},

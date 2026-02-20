@@ -110,6 +110,12 @@ local STACK_GROWTH = {
   COUNTERCLOCKWISE = "COUNTERCLOCKWISE",
 }
 
+local POSITION_MODE = {
+  CURSOR = "CURSOR",
+  SCREEN = "SCREEN",
+  FRAME = "FRAME",
+}
+
 -----------------------------------------------------
 --- Proc Overlay/Outline Atlas Settings
 -----------------------------------------------------
@@ -176,6 +182,7 @@ addonTable.Constants = {
   SORT_ORDER = SORT_ORDER,
   STACK_DIRECTION = STACK_DIRECTION,
   STACK_GROWTH = STACK_GROWTH,
+  POSITION_MODE = POSITION_MODE,
   PROC_OVERLAY_ATLAS_SETTINGS = PROC_OVERLAY_ATLAS_SETTINGS,
   PROC_OUTLINE_ATLAS_SETTINGS = PROC_OUTLINE_ATLAS_SETTINGS,
 }

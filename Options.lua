@@ -1,5 +1,7 @@
 local addonName, addonTable = ...
 local CooldownCursor = addonTable.Frame
+local State = addonTable.State
+local Internal = addonTable.Internal
 local OPTIONS_APP_NAME = addonName
 
 local AceConfig = LibStub and LibStub("AceConfig-3.0", true)
@@ -855,6 +857,43 @@ local options = {
           order = 80,
         },
 
+        positionMode = {
+          type = "select",
+          name = "Position Mode",
+          desc = "Choose how cooldown icons are positioned.\n\n" ..
+              "Cursor: follow the mouse cursor (default)\n" ..
+              "Screen: use a draggable anchor frame (shown only in Preview/Options)",
+          order = 85,
+          width = "normal",
+          values = function()
+            return CooldownCursor:GetValidPositionModes()
+          end,
+          get = function()
+            return CooldownCursor:GetDBValue("positionMode")
+          end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("positionMode", v)
+          end,
+        },
+
+        resetAnchor = {
+          type = "execute",
+          name = "Reset Anchor Position",
+          desc = "Reset the draggable anchor back to the screen center.",
+          order = 87,
+          width = "normal",
+          hidden = function()
+            return CooldownCursor:GetDBValue("positionMode") ~= "SCREEN"
+          end,
+          func = function()
+            CooldownCursorDB.global.offsetX = 0
+            CooldownCursorDB.global.offsetY = 0
+            if Internal and Internal.ApplyPositionMode then
+              Internal.ApplyPositionMode()
+            end
+          end,
+        },
+
         anchor = {
           type = "select",
           name = "Anchor Point",
@@ -863,6 +902,9 @@ local options = {
           order = 90,
           width = "normal",
           values = AnchorValues,
+          disabled = function()
+            return CooldownCursor:GetDBValue("positionMode") == "SCREEN"
+          end,
           get = function() return CooldownCursor:GetDBValue("anchor") end,
           set = function(_, v) CooldownCursor:SetDBString("anchor", v) end,
         },
@@ -876,6 +918,9 @@ local options = {
           min = 0,
           max = 100,
           step = 1,
+          disabled = function()
+            return CooldownCursor:GetDBValue("positionMode") == "SCREEN"
+          end,
           get = function() return CooldownCursor:GetDBValue("anchorPadding") end,
           set = function(_, v) CooldownCursor:SetDBNumber("anchorPadding", v) end,
         },
@@ -2120,13 +2165,21 @@ CooldownCursor.options = options
 
 function CooldownCursor:OnOptionsOpened()
   -- Options Panel Opened
+  State.optionsOpen = true
   self:RebuildSpellRuleOptions()
   CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
+  if Internal and Internal.UpdateAnchorVisibility then
+    Internal.UpdateAnchorVisibility()
+  end
 end
 
 function CooldownCursor:OnOptionsClosed()
   -- Options Panel Closed
+  State.optionsOpen = false
   CooldownCursor:SetPreviewMouseMode(true)
+  if Internal and Internal.UpdateAnchorVisibility then
+    Internal.UpdateAnchorVisibility()
+  end
 end
 
 function CooldownCursor:isAceConfigLoaded()

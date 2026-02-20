@@ -21,6 +21,7 @@ local FONT_TYPES = C.FONT_TYPES
 local SORT_ORDER = C.SORT_ORDER
 local STACK_DIRECTION = C.STACK_DIRECTION
 local STACK_GROWTH = C.STACK_GROWTH
+local POSITION_MODE = C.POSITION_MODE
 
 local CooldownCursor = addonTable.Frame
 
@@ -55,6 +56,12 @@ end
 
 function Settings:SetDBString(key, value)
   CooldownCursorDB.global[key] = string.format("%s", value)
+  if key == "positionMode" then
+    Internal.ApplyPositionMode()
+    if State.previewActive then
+      CooldownCursor:ApplyPreviewPosition()
+    end
+  end
   self:UpdateDisplay()
 end
 
@@ -255,6 +262,7 @@ function Settings:ResetSettings()
   CooldownCursorDB.global = {}
   self:ApplyDefaults()
   self:UpdateDisplay()
+  Internal.ApplyPositionMode()
   CooldownCursor:SetPreviewMouseMode(true)
 end
 
@@ -313,6 +321,13 @@ function Settings:GetValidStackDirections()
     SINGLE = "Single (Override)",
     HORIZONTAL = "Horizontal",
     RADIUS = "Radius (Circle)",
+  }
+end
+
+function Settings:GetValidPositionModes()
+  return {
+    CURSOR = "Cursor (Follow Mouse)",
+    SCREEN = "Screen (Drag Anchor)",
   }
 end
 

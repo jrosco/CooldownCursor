@@ -338,7 +338,7 @@ end
 local function GetIconFromPool()
   local iconFrame
   if #State.iconPool > 0 then
-    iconFrame = table.remove(State.iconPool)
+    iconFrame = table.remove(State.iconPool, 1)
   else
     iconFrame = CreateIconFrame(State.nextIconID)
     State.nextIconID = State.nextIconID + 1

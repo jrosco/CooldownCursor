@@ -913,6 +913,43 @@ local options = {
           end,
         },
 
+        positionMode = {
+          type = "select",
+          name = "Position Mode",
+          desc = "Choose how cooldown icons are positioned.\n\n" ..
+              "Cursor: follow the mouse cursor (default)\n" ..
+              "Screen: use a draggable anchor frame (shown only in Preview/Options)",
+          order = 85,
+          width = "normal",
+          values = function()
+            return CooldownCursor:GetValidPositionModes()
+          end,
+          get = function()
+            return CooldownCursor:GetDBValue("positionMode")
+          end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("positionMode", v)
+          end,
+        },
+
+        resetAnchor = {
+          type = "execute",
+          name = "Reset Anchor Position",
+          desc = "Reset the draggable anchor back to the screen center.",
+          order = 87,
+          width = "normal",
+          hidden = function()
+            return CooldownCursor:GetDBValue("positionMode") ~= "SCREEN"
+          end,
+          func = function()
+            CooldownCursorDB.global.offsetX = 0
+            CooldownCursorDB.global.offsetY = 0
+            if Internal and Internal.ApplyPositionMode then
+              Internal.ApplyPositionMode()
+            end
+          end,
+        },
+
         anchor = {
           type = "select",
           name = "Anchor Point",

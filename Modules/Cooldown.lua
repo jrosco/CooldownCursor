@@ -113,9 +113,12 @@ local function ApplyShowBehavior()
         if not CooldownCursorDB.global.showProcs and rule.metadata.baseCooldown == 0 then
           -- continue to next spell (can't use continue in Lua, so we use a nested if)
         elseif (rule.settings and rule.settings.enabled ~= false) and not State.activeIcons[spellID] and IsSpellKnownCached(spellID) then
-          local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
-          if durationObject then
-            Internal.ShowSpellIcon(spellID, durationObject)
+          local maxIcons = CooldownCursorDB.global.maxIcons or defaults.maxIcons
+          if #State.iconsByPriority < maxIcons then
+            local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
+            if durationObject then
+              Internal.ShowSpellIcon(spellID, durationObject)
+            end
           end
         end
       end

@@ -467,15 +467,14 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
     iconFrame.text:Hide()
   end
 
+  iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha))
+  iconFrame:SetScript("OnUpdate", Internal.UpdateCooldownIconFrame)
+  iconFrame:Show()
   if CooldownCursorDB.global.animation then
     iconFrame:SetScale(1)
     iconFrame.showAnim:Stop()
     iconFrame.showAnim:Play()
   end
-
-  iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha))
-  iconFrame:SetScript("OnUpdate", Internal.UpdateCooldownIconFrame)
-  iconFrame:Show()
 
   -- Update charge count display
   UpdateChargeCount(iconFrame, spellID)

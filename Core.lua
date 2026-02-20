@@ -221,6 +221,7 @@ local function CreateIconFrame(index)
   iconFrame.cooldown = CreateFrame("Cooldown", nil, iconFrame, "CooldownFrameTemplate")
   iconFrame.cooldown:SetAllPoints(iconFrame)
   iconFrame.cooldown:SetDrawEdge(false)
+  iconFrame.cooldown:SetDrawBling(false)
 
   local cooldownRegion = iconFrame.cooldown:GetRegions()
   if cooldownRegion and cooldownRegion:IsObjectType("FontString") then
@@ -356,6 +357,11 @@ ReturnIconToPool = function(iconFrame)
   end
   if iconFrame.fadeOut then
     iconFrame.fadeOut:Stop()
+  end
+
+  -- Clear cooldown swipe so pooled frames don't carry stale state
+  if iconFrame.cooldown then
+    iconFrame.cooldown:Clear()
   end
 
   -- Reset the frame to a clean default state before it goes back into the pool

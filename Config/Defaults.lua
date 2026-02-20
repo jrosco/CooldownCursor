@@ -272,6 +272,15 @@ function Defaults:ApplyBreakingChangesAndSetReleaseNotes()
   local _cleanedFlatRulesCheckMsg = CooldownCursorDB._migrated.cleanedFlatRules and "Your migration is marked cleaned" or
   "Your migration rules are pending cleanup"
   local releaseNotesByVersion = {
+    ["2.3.0"] = {
+      fixes = {
+        "Fixed a visual sparkle or flash that appeared when a spell icon first showed up",
+        "Fixed icons briefly disappearing and reappearing when multiple spells come off cooldown at the same time",
+        "Fixed 'Hide While Mounted' not always hiding icons when mounting — icons now reliably hide and restore on dismount",
+        "Fixed proc and charge spell icons ignoring the 'Hide While Mounted' and 'Show When' settings",
+        "Fixed icons sometimes appearing transparent in 'Off Cooldown (Ready)' display mode",
+      },
+    },
     ["2.2.2"] = {
       fixes = {
         "Event triggering with ApplyShowBehavior() when show out-of-combat / always enabled",

@@ -278,6 +278,7 @@ function Defaults:ApplyBreakingChangesAndSetReleaseNotes()
         "Fixed icons briefly disappearing and reappearing when multiple spells come off cooldown at the same time",
         "Fixed 'Hide While Mounted' not always hiding icons when mounting — icons now reliably hide and restore on dismount",
         "Fixed proc and charge spell icons ignoring the 'Hide While Mounted' and 'Show When' settings",
+        "Fixed UNIT_SPELLCAST_SENT parsing to read the correct spell ID parameter",
         "Fixed icons sometimes appearing transparent in 'Off Cooldown (Ready)' display mode",
       },
     },

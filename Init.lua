@@ -236,9 +236,15 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
     -- category, startRecoveryCategory. A nil spellID means all cooldowns
     -- should be refreshed (handled by the nil check below).
     if event == "SPELL_UPDATE_COOLDOWN" then
+      print("SPELL_UPDATE_COOLDOWN event received with args:", ...)
       spellID, _, _, _ = ...
     else
-      unit, _, spellID = ...
+      if event == "UNIT_SPELLCAST_SENT" then
+        print("UNIT_SPELLCAST_SENT event received with args:", ...)
+        unit, _, _, spellID = ...
+      else
+        unit, _, spellID = ...
+      end
       if unit ~= "player" then return end
     end
     if not spellID then
@@ -246,6 +252,7 @@ CooldownCursor:SetScript("OnEvent", function(self, event, ...)
       return
     end
 
+    print("Processing spellID:", spellID)
     -- Check user spell rules before doing any cooldown queries
     local show, rule = CooldownCursor:GetSpellRule(spellID)
     if not show then return end

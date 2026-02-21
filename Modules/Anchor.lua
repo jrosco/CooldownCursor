@@ -15,7 +15,9 @@ local POSITION_MODE = C.POSITION_MODE
 ----------------------------------------------------
 -- Screen Anchor (Drag)
 ----------------------------------------------------
+local IsAnchorUnlocked
 local anchorFrame
+local anchorDragging = false
 
 local function EnsureAnchorFrame()
   if anchorFrame then return anchorFrame end
@@ -49,11 +51,14 @@ local function EnsureAnchorFrame()
     if InCombatLockdown() then return end
     local mode = CooldownCursorDB.global.positionMode or defaults.positionMode
     if mode ~= POSITION_MODE.SCREEN then return end
+    if not IsAnchorUnlocked() then return end
+    anchorDragging = true
     self:StartMoving()
   end)
 
   anchorFrame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
+    anchorDragging = false
     local ux, uy = UIParent:GetCenter()
     local ax, ay = self:GetCenter()
     if ux and uy and ax and ay then
@@ -69,6 +74,9 @@ local function EnsureAnchorFrame()
 end
 
 local function ApplyAnchorPosition()
+  if anchorDragging then
+    return
+  end
   local anchor = EnsureAnchorFrame()
   local ox = CooldownCursorDB.global.offsetX or defaults.offsetX or 0
   local oy = CooldownCursorDB.global.offsetY or defaults.offsetY or 0
@@ -81,6 +89,10 @@ local function IsScreenMode()
   return mode == POSITION_MODE.SCREEN
 end
 
+IsAnchorUnlocked = function()
+  return CooldownCursorDB.global.anchorUnlocked == true
+end
+
 local function UpdateAnchorVisibility()
   if not IsScreenMode() then
     if anchorFrame then anchorFrame:Hide() end
@@ -88,7 +100,7 @@ local function UpdateAnchorVisibility()
   end
 
   ApplyAnchorPosition()
-  if State.previewActive or State.optionsOpen then
+  if IsAnchorUnlocked() and not InCombatLockdown() then
     anchorFrame:Show()
   else
     anchorFrame:Hide()

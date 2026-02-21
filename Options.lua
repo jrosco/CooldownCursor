@@ -895,6 +895,29 @@ local options = {
           end,
         },
 
+        unlockAnchor = {
+          type = "toggle",
+          name = "Unlock Screen Anchor",
+          desc = "Show and unlock the draggable anchor for placement on screen.",
+          order = 15,
+          width = "normal",
+          hidden = function()
+            return CooldownCursor:GetDBValue("positionMode") ~= "SCREEN"
+          end,
+          disabled = function()
+            return InCombatLockdown()
+          end,
+          get = function()
+            return CooldownCursor:GetDBValue("anchorUnlocked")
+          end,
+          set = function(_, v)
+            CooldownCursor:SetDBBoolean("anchorUnlocked", v)
+            if Internal and Internal.UpdateAnchorVisibility then
+              Internal.UpdateAnchorVisibility()
+            end
+          end,
+        },
+
         resetAnchor = {
           type = "execute",
           name = "Reset Anchor Position",
@@ -903,6 +926,9 @@ local options = {
           width = "normal",
           hidden = function()
             return CooldownCursor:GetDBValue("positionMode") ~= "SCREEN"
+          end,
+          disabled = function()
+            return InCombatLockdown()
           end,
           func = function()
             CooldownCursorDB.global.offsetX = 0

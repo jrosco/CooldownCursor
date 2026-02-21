@@ -51,6 +51,7 @@ local defaults = {
   showBehavior = SHOW_BEHAVIOR.ON_COOLDOWN,
   hideWhileMounted = false,
   positionMode = POSITION_MODE.CURSOR,
+  anchorUnlocked = false,
   anchor = ANCHOR_POSITION.TOPRIGHT,
   anchorPadding = 2,
   spellTextFont = "Friz Quadrata TT",

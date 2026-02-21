@@ -134,6 +134,8 @@ end
 local function UpdateSingleIcon(self, icon, spellID)
   if not icon then return end
 
+  local scale = CooldownCursorDB.global.scale or defaults.scale
+
   icon.icon:SetShown(not CooldownCursorDB.global.iconHide)
   icon.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha or defaults.iconAlpha))
 
@@ -146,9 +148,10 @@ local function UpdateSingleIcon(self, icon, spellID)
     ApplyFonts(
       icon.cooldownText,
       CooldownCursorDB.global.cooldownTextFontPath or defaults.cooldownTextFontPath,
-      CooldownCursorDB.global.cooldownTextSize or defaults.cooldownTextSize,
+      (CooldownCursorDB.global.cooldownTextSize or defaults.cooldownTextSize) * scale,
       CooldownCursorDB.global.cooldownTextFontType or defaults.cooldownTextFontType
     )
+    icon.cooldownText:SetScale(1)
 
     local cdr, cdg, cdb = HexToRGB(CooldownCursorDB.global.cooldownTextColor or defaults.cooldownTextColor)
     local cdAlpha = PercentToAlpha(CooldownCursorDB.global.cooldownTextAlpha or defaults.cooldownTextAlpha)
@@ -164,9 +167,10 @@ local function UpdateSingleIcon(self, icon, spellID)
     ApplyFonts(
       icon.text,
       CooldownCursorDB.global.spellTextFontPath or defaults.spellTextFontPath,
-      CooldownCursorDB.global.spellTextSize or defaults.spellTextSize,
+      (CooldownCursorDB.global.spellTextSize or defaults.spellTextSize) * scale,
       CooldownCursorDB.global.spellTextFontType or defaults.spellTextFontType
     )
+    icon.text:SetScale(1)
 
     local textr, textg, textb = HexToRGB(CooldownCursorDB.global.spellTextColor or defaults.spellTextColor)
     local textAlpha = PercentToAlpha(CooldownCursorDB.global.spellTextAlpha or defaults.spellTextAlpha)
@@ -177,9 +181,10 @@ local function UpdateSingleIcon(self, icon, spellID)
     ApplyFonts(
       icon.chargeText,
       CooldownCursorDB.global.chargeTextFontPath or defaults.chargeTextFontPath,
-      CooldownCursorDB.global.chargeTextSize or defaults.chargeTextSize,
+      (CooldownCursorDB.global.chargeTextSize or defaults.chargeTextSize) * scale,
       CooldownCursorDB.global.chargeTextFontType or defaults.chargeTextFontType
     )
+    icon.chargeText:SetScale(1)
 
     local chr, chg, chb = HexToRGB(CooldownCursorDB.global.chargeTextColor or defaults.chargeTextColor)
     local chAlpha = PercentToAlpha(CooldownCursorDB.global.chargeTextAlpha or defaults.chargeTextAlpha)
@@ -220,10 +225,16 @@ local function UpdateSingleIcon(self, icon, spellID)
   icon.text:SetPoint(anchorPoint.point, icon, anchorPoint.relativeTo, anchorPoint.x, anchorPoint.y)
 
   local size = CooldownCursor:GetEffectiveIconSize(spellID)
-  local scale = CooldownCursorDB.global.scale or defaults.scale
   icon:SetSize(size * scale, size * scale)
-  icon.text:SetScale(scale)
-  icon.cooldown:SetScale(scale)
+  if icon.icon then
+    icon.icon:ClearAllPoints()
+    icon.icon:SetAllPoints(icon)
+  end
+  if icon.cooldown then
+    icon.cooldown:ClearAllPoints()
+    icon.cooldown:SetAllPoints(icon.icon or icon)
+  end
+  icon.cooldown:SetScale(1)
   if icon.procOverlay then
     local overlayAtlas = CooldownCursorDB.global.procOverlayAtlas or defaults.procOverlayAtlas
     local overlayScale = 1.6

@@ -371,6 +371,22 @@ ReturnIconToPool = function(iconFrame)
   iconFrame:Hide()
   iconFrame:SetScript("OnUpdate", nil)
   iconFrame:SetScale(1)
+  iconFrame:SetSize(defaults.iconSize, defaults.iconSize)
+  iconFrame:SetAlpha(1)
+  if iconFrame.icon then
+    iconFrame.icon:SetAlpha(1)
+  end
+  if iconFrame.text then
+    iconFrame.text:SetScale(1)
+  end
+  if iconFrame.chargeText then
+    iconFrame.chargeText:SetScale(1)
+  end
+  if iconFrame.cooldown then
+    iconFrame.cooldown:SetScale(1)
+    iconFrame.cooldown:SetHideCountdownNumbers(false)
+    iconFrame.cooldown:SetDrawSwipe(true)
+  end
   iconFrame.spellID = nil
   iconFrame.addedTime = nil
   iconFrame.priority = 0

@@ -404,8 +404,8 @@ local options = {
         description = {
           type = "description",
           name = "|cff00ff00Quick access to the most commonly used settings.|r\n" ..
-              "These are the essential settings to get started!\n" ..
-              "Configure these first, then explore other tabs for advanced options.",
+              "To start tracking cooldowns, add spells in the |cffffd100Spell Rules|r tab.\n" ..
+              "Configure options here, then explore other tabs for advanced settings.",
           order = 2,
         },
 

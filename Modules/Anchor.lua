@@ -15,7 +15,6 @@ local POSITION_MODE = C.POSITION_MODE
 ----------------------------------------------------
 -- Screen Anchor (Drag)
 ----------------------------------------------------
-local IsAnchorUnlocked
 local anchorFrame
 local anchorDragging = false
 
@@ -43,15 +42,15 @@ local function EnsureAnchorFrame()
   anchorFrame._border = border
 
   local label = anchorFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  label:SetPoint("TOP", anchorFrame, "BOTTOM", 0, -2)
-  label:SetText("CooldownCursor")
+  label:SetPoint("TOP", anchorFrame, "CENTER", 0, 0)
+  label:SetText("Drag")
   anchorFrame._label = label
 
   anchorFrame:SetScript("OnDragStart", function(self)
     if InCombatLockdown() then return end
     local mode = CooldownCursorDB.global.positionMode or defaults.positionMode
     if mode ~= POSITION_MODE.SCREEN then return end
-    if not IsAnchorUnlocked() then return end
+    if not State.previewActive then return end
     anchorDragging = true
     self:StartMoving()
   end)
@@ -89,10 +88,6 @@ local function IsScreenMode()
   return mode == POSITION_MODE.SCREEN
 end
 
-IsAnchorUnlocked = function()
-  return CooldownCursorDB.global.anchorUnlocked == true
-end
-
 local function UpdateAnchorVisibility()
   if not IsScreenMode() then
     if anchorFrame then anchorFrame:Hide() end
@@ -100,7 +95,7 @@ local function UpdateAnchorVisibility()
   end
 
   ApplyAnchorPosition()
-  if IsAnchorUnlocked() and not InCombatLockdown() then
+  if State.previewActive and not InCombatLockdown() then
     anchorFrame:Show()
   else
     anchorFrame:Hide()

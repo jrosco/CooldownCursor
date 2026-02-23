@@ -15,6 +15,7 @@ local DEFAULT_SYSTEM_FONTS = C.DEFAULT_SYSTEM_FONTS
 local SORT_ORDER = C.SORT_ORDER
 local STACK_DIRECTION = C.STACK_DIRECTION
 local STACK_GROWTH = C.STACK_GROWTH
+local POSITION_MODE = C.POSITION_MODE
 
 ----------------------------------------------------
 -- Defaults / SavedVariables
@@ -49,6 +50,8 @@ local defaults = {
   showWhen = SHOW_WHEN_STATE.COMBAT,
   showBehavior = SHOW_BEHAVIOR.ON_COOLDOWN,
   hideWhileMounted = false,
+  positionMode = POSITION_MODE.CURSOR,
+  anchorUnlocked = false,
   anchor = ANCHOR_POSITION.TOPRIGHT,
   anchorPadding = 2,
   spellTextFont = "Friz Quadrata TT",
@@ -273,6 +276,9 @@ function Defaults:ApplyBreakingChangesAndSetReleaseNotes()
   "Your migration rules are pending cleanup"
   local releaseNotesByVersion = {
     ["2.3.0"] = {
+      newFeatures = {
+        "Added Screen position mode with a draggable anchor (visible in Preview/Options)",
+      },
       fixes = {
         "Fixed a visual sparkle or flash that appeared when a spell icon first showed up",
         "Fixed icons briefly disappearing and reappearing when multiple spells come off cooldown at the same time",

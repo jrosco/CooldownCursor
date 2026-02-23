@@ -18,6 +18,7 @@ local SORT_ORDER = C.SORT_ORDER
 local STACK_DIRECTION = C.STACK_DIRECTION
 local STACK_GROWTH = C.STACK_GROWTH
 local FRAME_STRATA = C.FRAME_STRATA
+local POSITION_MODE = C.POSITION_MODE
 local CD_TEXT_ANCHOR_POINTS = C.CD_TEXT_ANCHOR_POINTS
 local SPELL_TEXT_ANCHOR_POINTS = C.SPELL_TEXT_ANCHOR_POINTS
 local CHARGE_TEXT_ANCHOR_POINTS = C.CHARGE_TEXT_ANCHOR_POINTS
@@ -332,6 +333,10 @@ local function UpdateIconPositions()
       end
     end
   end
+
+  if (CooldownCursorDB.global.positionMode or defaults.positionMode) == POSITION_MODE.SCREEN then
+    Internal.ApplyScreenAnchors()
+  end
 end
 
 ----------------------------------------------------
@@ -479,7 +484,12 @@ local function SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
   end
 
   iconFrame.icon:SetAlpha(PercentToAlpha(CooldownCursorDB.global.iconAlpha))
-  iconFrame:SetScript("OnUpdate", Internal.UpdateCooldownIconFrame)
+  local positionMode = CooldownCursorDB.global.positionMode or defaults.positionMode
+  if positionMode == POSITION_MODE.SCREEN then
+    iconFrame:SetScript("OnUpdate", nil)
+  else
+    iconFrame:SetScript("OnUpdate", Internal.UpdateCooldownIconFrame)
+  end
   iconFrame:Show()
   if CooldownCursorDB.global.animation then
     iconFrame:SetScale(1)
@@ -535,6 +545,9 @@ ShowSpellIcon = function(spellID, durationObject, fromProc)
     local iconFrame, iconData = SetupNewIcon(spellID, spellInfo, durationObject, fromProc)
     if iconFrame then
       ScheduleHideTimerForIcon(iconFrame, spellID)
+    end
+    if (CooldownCursorDB.global.positionMode or defaults.positionMode) == POSITION_MODE.SCREEN then
+      Internal.ApplyScreenAnchors()
     end
     return iconFrame, iconData
   end
@@ -600,6 +613,10 @@ local function UpdateDisplay(self, spellID)
       firstIcon.stackOffsetY = 0
       UpdateSingleIcon(self, firstIcon, State.iconsByPriority[1].spellID)
     end
+  end
+
+  if (CooldownCursorDB.global.positionMode or defaults.positionMode) == POSITION_MODE.SCREEN then
+    Internal.ApplyScreenAnchors()
   end
 
   -- Apply Masque skin once after all icons are updated

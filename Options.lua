@@ -1,5 +1,7 @@
 local addonName, addonTable = ...
 local CooldownCursor = addonTable.Frame
+local State = addonTable.State
+local Internal = addonTable.Internal
 local OPTIONS_APP_NAME = addonName
 
 local AceConfig = LibStub and LibStub("AceConfig-3.0", true)
@@ -869,16 +871,81 @@ local options = {
           set = function(_, v) CooldownCursor:SetDBBoolean("iconHide", v) end,
         },
 
-        spacer3 = {
-          type = "description",
-          name = " ",
-          order = 75,
+      },
+    },
+
+    -- ========================================
+    -- DISPLAY & PLACEMENT TAB
+    -- ========================================
+    positionGroup = {
+      type = "group",
+      name = "Display & Placement",
+      order = 150,
+      args = {
+
+        header = {
+          type = "header",
+          name = "Display & Placement",
+          order = 1,
         },
 
-        positionHeader = {
+        description = {
+          type = "description",
+          name = "Configure where cooldown icons appear and how multiple icons are arranged.\n\n" ..
+              "|cffaaaaaaTip: Screen mode uses a draggable anchor that is only visible in Preview.|r",
+          order = 2,
+        },
+
+        spacer1 = {
+          type = "description",
+          name = " ",
+          order = 3,
+        },
+
+        placementHeader = {
           type = "header",
-          name = "Position",
-          order = 80,
+          name = "Placement",
+          order = 5,
+        },
+
+        positionMode = {
+          type = "select",
+          name = "Position Mode",
+          desc = "Choose how cooldown icons are positioned.\n\n" ..
+              "Cursor: follow the mouse cursor (default)\n" ..
+              "Screen: use a draggable anchor frame (shown only in Preview)",
+          order = 10,
+          width = "normal",
+          values = function()
+            return CooldownCursor:GetValidPositionModes()
+          end,
+          get = function()
+            return CooldownCursor:GetDBValue("positionMode")
+          end,
+          set = function(_, v)
+            CooldownCursor:SetDBString("positionMode", v)
+          end,
+        },
+
+        resetAnchor = {
+          type = "execute",
+          name = "Reset Anchor Position",
+          desc = "Reset the draggable anchor back to the screen center.",
+          order = 15,
+          width = "normal",
+          hidden = function()
+            return CooldownCursor:GetDBValue("positionMode") ~= "SCREEN"
+          end,
+          disabled = function()
+            return InCombatLockdown()
+          end,
+          func = function()
+            CooldownCursorDB.global.offsetX = 0
+            CooldownCursorDB.global.offsetY = 0
+            if Internal and Internal.ApplyPositionMode then
+              Internal.ApplyPositionMode()
+            end
+          end,
         },
 
         anchor = {
@@ -886,9 +953,12 @@ local options = {
           name = "Anchor Point",
           desc = "Where to position the icon relative to your cursor.\n\n" ..
               "TOPLEFT = Icon appears above and left of cursor",
-          order = 90,
+          order = 20,
           width = "normal",
           values = AnchorValues,
+          disabled = function()
+            return CooldownCursor:GetDBValue("positionMode") == "SCREEN"
+          end,
           get = function() return CooldownCursor:GetDBValue("anchor") end,
           set = function(_, v) CooldownCursor:SetDBString("anchor", v) end,
         },
@@ -897,11 +967,14 @@ local options = {
           type = "range",
           name = "Cursor Distance",
           desc = "How far from the cursor the icon appears (in pixels).",
-          order = 100,
+          order = 25,
           width = "normal",
           min = 0,
           max = 100,
           step = 1,
+          disabled = function()
+            return CooldownCursor:GetDBValue("positionMode") == "SCREEN"
+          end,
           get = function() return CooldownCursor:GetDBValue("anchorPadding") end,
           set = function(_, v) CooldownCursor:SetDBNumber("anchorPadding", v) end,
         },
@@ -911,7 +984,7 @@ local options = {
         --   type = "range",
         --   name = "Horizontal Offset",
         --   desc = "Additional horizontal adjustment (negative = left, positive = right).",
-        --   order = 110,
+        --   order = 50,
         --   width = "normal",
         --   min = -500, max = 500, step = 1,
         --   get = function() return CooldownCursor:GetDBValue("offsetX") end,
@@ -922,53 +995,40 @@ local options = {
         --   type = "range",
         --   name = "Vertical Offset",
         --   desc = "Additional vertical adjustment (negative = down, positive = up).",
-        --   order = 120,
+        --   order = 60,
         --   width = "normal",
         --   min = -500, max = 500, step = 1,
         --   get = function() return CooldownCursor:GetDBValue("offsetY") end,
         --   set = function(_, v) CooldownCursor:SetDBNumber("offsetY", v) end,
         -- },
 
-      },
-    },
-
-    -- ========================================
-    -- LAYOUT TAB (Multi-Icon)
-    -- ========================================
-    layoutGroup = {
-      type = "group",
-      name = "Layout",
-      order = 200,
-      args = {
-
-        header = {
-          type = "header",
-          name = "Multi-Icon Layout",
-          order = 1,
-        },
-
-        description = {
-          type = "description",
-          name = "Configure how multiple cooldown icons are arranged.\n\n" ..
-              "|cffaaaaaaTip: These settings only apply when Display Mode is set to VERTICAL, HORIZONTAL, or RADIUS.|r",
-          order = 2,
-        },
-
-        spacer1 = {
+        spacer2 = {
           type = "description",
           name = " ",
-          order = 5,
+          order = 30,
+        },
+
+        layoutHeader = {
+          type = "header",
+          name = "Layout",
+          order = 40,
+        },
+
+        layoutDescription = {
+          type = "description",
+          name = "|cffaaaaaaTip: These settings only apply when Display Mode is set to VERTICAL, HORIZONTAL, or RADIUS.|r",
+          order = 41,
         },
 
         displayMode = {
           type = "select",
           name = "Display Mode",
           desc = "How cooldown icons appear:\n\n" ..
-              "• SINGLE - Shows only the most recent cooldown (recommended for beginners)\n" ..
-              "• VERTICAL - Stack multiple cooldowns vertically\n" ..
-              "• HORIZONTAL - Stack multiple cooldowns horizontally\n" ..
-              "• RADIUS - Arrange multiple cooldowns in a circle around cursor",
-          order = 10,
+              "- SINGLE - Shows only the most recent cooldown (recommended for beginners)\n" ..
+              "- VERTICAL - Stack multiple cooldowns vertically\n" ..
+              "- HORIZONTAL - Stack multiple cooldowns horizontally\n" ..
+              "- RADIUS - Arrange multiple cooldowns in a circle around cursor",
+          order = 50,
           width = "normal",
           values = function()
             return CooldownCursor:GetValidStackDirections()
@@ -987,7 +1047,7 @@ local options = {
           name = "Maximum Icons",
           desc = "How many cooldown icons to show at once.\n\n" ..
               "When you have more cooldowns than this, the oldest/lowest priority icons are removed.",
-          order = 10,
+          order = 60,
           width = "normal",
           min = 1,
           max = 10,
@@ -1007,7 +1067,7 @@ local options = {
           type = "select",
           name = "Growth Direction",
           desc = "Which direction icons stack in.",
-          order = 20,
+          order = 70,
           width = "normal",
           values = function()
             return CooldownCursor:GetValidStackGrowth()
@@ -1023,28 +1083,10 @@ local options = {
           end,
         },
 
-        anchor = {
-          type = "select",
-          name = "Anchor Point",
-          desc = "Where to position the icon relative to your cursor.\n\n" ..
-              "TOPLEFT = Icon appears above and left of cursor",
-          order = 21,
-          width = "normal",
-          values = AnchorValues,
-          get = function() return CooldownCursor:GetDBValue("anchor") end,
-          set = function(_, v) CooldownCursor:SetDBString("anchor", v) end,
-        },
-
-        spacer2 = {
-          type = "description",
-          name = " ",
-          order = 25,
-        },
-
         stackingHeader = {
           type = "header",
           name = "Vertical / Horizontal Spacing",
-          order = 30,
+          order = 80,
         },
 
         stackSpacing = {
@@ -1052,7 +1094,7 @@ local options = {
           name = "Icon Spacing",
           desc = "Gap between stacked icons in pixels.\n\n" ..
               "Only applies to VERTICAL and HORIZONTAL modes.",
-          order = 40,
+          order = 90,
           width = "normal",
           min = -20,
           max = 20,
@@ -1072,13 +1114,13 @@ local options = {
         spacer3 = {
           type = "description",
           name = " ",
-          order = 45,
+          order = 95,
         },
 
         radiusHeader = {
           type = "header",
           name = "Radius Settings",
-          order = 50,
+          order = 100,
         },
 
         radiusDistance = {
@@ -1086,7 +1128,7 @@ local options = {
           name = "Circle Radius",
           desc = "Distance from cursor for radius layout (in pixels).\n\n" ..
               "Only applies to RADIUS mode.",
-          order = 60,
+          order = 110,
           width = "normal",
           min = 40,
           max = 200,
@@ -1106,11 +1148,11 @@ local options = {
           type = "range",
           name = "Starting Angle",
           desc = "Where the first icon appears in the circle:\n" ..
-              "• 0° = Right\n" ..
-              "• 90° = Bottom\n" ..
-              "• 180° = Left\n" ..
-              "• 270° = Top",
-          order = 70,
+              "- 0 deg = Right\n" ..
+              "- 90 deg = Bottom\n" ..
+              "- 180 deg = Left\n" ..
+              "- 270 deg = Top",
+          order = 120,
           width = "normal",
           min = 0,
           max = 359,
@@ -1129,20 +1171,20 @@ local options = {
         spacer4 = {
           type = "description",
           name = " ",
-          order = 75,
+          order = 125,
         },
 
         sortHeader = {
           type = "header",
           name = "Icon Sorting",
-          order = 80,
+          order = 130,
         },
 
         sortOrder = {
           type = "select",
           name = "Sort By",
           desc = "How to order multiple cooldown icons.",
-          order = 90,
+          order = 140,
           width = "normal",
           values = function()
             return CooldownCursor:GetValidSortOrders()
@@ -1163,21 +1205,21 @@ local options = {
           name = function()
             local dir = CooldownCursor:GetDBValue("stackDirection")
             if dir == "SINGLE" then
-              return "|cffaaaaaa• Sorting doesn't apply in SINGLE mode|r"
+              return "|cffaaaaaa- Sorting doesn't apply in SINGLE mode|r"
             end
             local sortOrder = CooldownCursor:GetDBValue("sortOrder")
             if sortOrder == "DURATION" then
-              return "|cffaaaaaa• Shortest cooldowns appear first|r"
+              return "|cffaaaaaa- Shortest cooldowns appear first|r"
             elseif sortOrder == "ALPHABETICAL" then
-              return "|cffaaaaaa• Sorted A-Z by spell name|r"
+              return "|cffaaaaaa- Sorted A-Z by spell name|r"
             elseif sortOrder == "PRIORITY" then
-              return "|cffaaaaaa• Sorted by spell rule priority (set in Spell Rules tab)|r"
+              return "|cffaaaaaa- Sorted by spell rule priority (set in Spell Rules tab)|r"
             elseif sortOrder == "TIME_ADDED" then
-              return "|cffaaaaaa• Oldest cooldowns appear first|r"
+              return "|cffaaaaaa- Oldest cooldowns appear first|r"
             end
             return ""
           end,
-          order = 95,
+          order = 145,
         },
       },
     },
@@ -2146,13 +2188,21 @@ CooldownCursor.options = options
 
 function CooldownCursor:OnOptionsOpened()
   -- Options Panel Opened
+  State.optionsOpen = true
   self:RebuildSpellRuleOptions()
   CooldownCursor:ApplyBreakingChangesAndSetReleaseNotes()
+  if Internal and Internal.UpdateAnchorVisibility then
+    Internal.UpdateAnchorVisibility()
+  end
 end
 
 function CooldownCursor:OnOptionsClosed()
   -- Options Panel Closed
+  State.optionsOpen = false
   CooldownCursor:SetPreviewMouseMode(true)
+  if Internal and Internal.UpdateAnchorVisibility then
+    Internal.UpdateAnchorVisibility()
+  end
 end
 
 function CooldownCursor:isAceConfigLoaded()
@@ -2194,3 +2244,4 @@ function CooldownCursor:NotifyOptionsChanged()
     AceConfigRegistry:NotifyChange("CooldownCursor")
   end
 end
+

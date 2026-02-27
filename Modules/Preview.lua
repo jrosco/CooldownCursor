@@ -4,9 +4,11 @@
 ----------------------------------------------------
 local _, addonTable = ...
 
+local C = addonTable.Constants
 local defaults = addonTable.Defaults
 local State = addonTable.State
 local Internal = addonTable.Internal
+local POSITION_MODE = C.POSITION_MODE
 local IsProcOverlayEnabled = Internal.IsProcOverlayEnabled
 local IsProcOutlineEnabled = Internal.IsProcOutlineEnabled
 local ShowSpellIcon = Internal.ShowSpellIcon
@@ -45,10 +47,12 @@ local function StopPreview()
     State.previewTicker = nil
   end
   HidePreviewIndicator()
+  Internal.UpdateAnchorVisibility()
 end
 
 local function StartPreviewLoop(showFunc, intervalSeconds)
   State.previewActive = true
+  Internal.UpdateAnchorVisibility()
   ShowPreviewIndicator()
   showFunc()
   State.previewTicker = C_Timer.NewTicker(intervalSeconds, function()
@@ -216,7 +220,16 @@ end
 function Preview:ApplyPreviewPosition()
   if not State.previewActive then return end
 
+  local positionMode = CooldownCursorDB.global.positionMode or defaults.positionMode
   local isRadius = (CooldownCursorDB.global.stackDirection or defaults.stackDirection) == "RADIUS"
+
+  if positionMode == POSITION_MODE.SCREEN then
+    for _, iconData in ipairs(State.iconsByPriority) do
+      iconData.iconFrame:SetScript("OnUpdate", nil)
+    end
+    Internal.ApplyScreenAnchors()
+    return
+  end
 
   if State.previewMouseMode then
     for i, iconData in ipairs(State.iconsByPriority) do

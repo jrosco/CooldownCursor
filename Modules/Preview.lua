@@ -121,6 +121,7 @@ function Preview:Preview()
     durationObj:SetTimeFromStart(GetTime(), 30)
     local iconFrame, iconData = ShowSpellIcon(116, durationObj) -- Frostbolt
     ApplyPreviewProc(iconFrame, iconData)
+    self:UpdateDisplay()
     self:ApplyPreviewPosition()
   end
 
@@ -209,6 +210,7 @@ function Preview:PreviewMultiIcon()
         ApplyPreviewProc(iconFrame, iconData)
       end
     end
+    self:UpdateDisplay()
     self:ApplyPreviewPosition()
   end
 

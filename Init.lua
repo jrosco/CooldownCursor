@@ -183,6 +183,7 @@ end
 eventHandlers.PLAYER_SPECIALIZATION_CHANGED = function(self, unit)
   if unit ~= "player" then return end
   wipe(State.knownSpellCache)
+  self:InvalidateSpellBookCache()
   self:HideAllIcons(true)
   ApplyShowBehavior()
 end

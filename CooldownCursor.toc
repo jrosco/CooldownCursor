@@ -2,7 +2,7 @@
 ## Title: CooldownCursor
 ## Notes: Shows cooldown timers at your cursor position
 ## Author: jrosco
-## Version: 2.3.0
+## Version: 2.3.1
 ## SavedVariables: CooldownCursorDB
 ## OptionalDeps: Masque
 
@@ -18,6 +18,7 @@ Modules\Anchor.lua
 Modules\Cooldown.lua
 Modules\Settings.lua
 Modules\Preview.lua
+Modules\Debug.lua
 Init.lua
 Options.lua
 Slash.lua

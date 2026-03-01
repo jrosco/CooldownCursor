@@ -248,6 +248,19 @@ function Spells:InvalidateSpellBookCache()
   spellBookCacheTime = 0
 end
 
+--- Get metadata about the spellbook cache state (for debug inspection)
+-- @return table - { size, age, expires, valid }
+function Spells:GetCacheInfo()
+  local now = GetTime()
+  local age = spellBookCacheTime > 0 and (now - spellBookCacheTime) or nil
+  return {
+    size    = spellBookCache and #spellBookCache or 0,
+    age     = age,
+    expires = CACHE_DURATION,
+    valid   = spellBookCache ~= nil and age ~= nil and age < CACHE_DURATION,
+  }
+end
+
 --- Get the SpellBookItemType name for a given enum value
 -- @param enumValue number - Enum.SpellBookItemType value
 -- @return string - Human readable name

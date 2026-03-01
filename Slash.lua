@@ -59,6 +59,7 @@ local function Help()
  /cdcursor help                     - Show this help message
  /cdcursor reset                    - Reset all settings to default
  /cdcursor status                   - Show current settings
+ /cdcursor debug                    - Toggle debug mode (subcommands: state|icons|rules|spell|pool|events|log|cache|filter)
 ]])
 end
 
@@ -530,6 +531,34 @@ function CooldownCursor:SerializeSettings()
   end
 
   return table.concat(parts, ";")
+end
+
+handlers.debug = function(arg1, arg2)
+  if not arg1 or arg1 == "" then
+    CooldownCursor:Toggle()
+    return
+  end
+  if arg1 == "state" then
+    CooldownCursor:DumpState()
+  elseif arg1 == "icons" then
+    CooldownCursor:DumpIcons()
+  elseif arg1 == "rules" then
+    CooldownCursor:DumpRules()
+  elseif arg1 == "spell" then
+    CooldownCursor:DumpSpell(arg2)
+  elseif arg1 == "pool" then
+    CooldownCursor:DumpPool()
+  elseif arg1 == "events" then
+    CooldownCursor:ToggleEvents()
+  elseif arg1 == "log" then
+    CooldownCursor:DumpLog()
+  elseif arg1 == "cache" then
+    CooldownCursor:DumpCache()
+  elseif arg1 == "filter" then
+    CooldownCursor:ToggleFilter(arg2)
+  else
+    Print("debug subcommands: state | icons | rules | spell <id> | pool | events | log | cache | filter")
+  end
 end
 
 handlers.status = function()

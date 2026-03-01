@@ -42,3 +42,4 @@ luac.out
 .vscode/settings.json
 Libs/
 dont_commit/
+.lh/

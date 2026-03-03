@@ -18,6 +18,7 @@ Modules\Anchor.lua
 Modules\Cooldown.lua
 Modules\Settings.lua
 Modules\Preview.lua
+Modules\Debug.lua
 Init.lua
 Options.lua
 Slash.lua

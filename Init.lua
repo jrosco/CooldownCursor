@@ -294,6 +294,9 @@ end
 -- Event dispatcher
 ----------------------------------------------------
 CooldownCursor:SetScript("OnEvent", function(self, event, ...)
+  if Internal.LogEvent then
+    Internal.LogEvent(event, ...)
+  end
   local handler = eventHandlers[event]
   if handler then
     handler(self, ...)

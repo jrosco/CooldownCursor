@@ -280,7 +280,7 @@ function Defaults:ApplyBreakingChangesAndSetReleaseNotes()
         "Added debugging utilities and inline documentation to the Debug module",
       },
       fixes = {
-        "Fixed stale spell book data after a spec change, spell cache is now force-expired on PLAYER_SPECIALIZATION_CHANGED, preventing outdated spell data for up to 60 seconds after swapping specs",
+        "Fixed stale spell book data after a spec change — spell cache is now force-expired on PLAYER_SPECIALIZATION_CHANGED, preventing outdated spell data for up to 60 seconds after swapping specs",
         "Removed duplicated anchor logic from Cursor.lua (was silently overwritten by Anchor.lua at load time)",
         "Refactored event handling in Init.lua to a dispatch table for cleaner per-event logic and easier future additions",
       },
